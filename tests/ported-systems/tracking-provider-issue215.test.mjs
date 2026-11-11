@@ -29,6 +29,52 @@ test("Clarity fails closed without explicit consent, honors opt-out and excludes
   }
 });
 
+
+test("Clarity client route guard does not initialize on admin, account or consent-denied visits",async()=>{
+  const {readFileSync}=await import("node:fs");
+  const {runInNewContext}=await import("node:vm");
+  const ts=(await import("typescript")).default;
+  const source=readFileSync("components/MicrosoftClarity.tsx","utf8");
+  const code=ts.transpileModule(source,{
+    compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}
+  }).outputText;
+  const Clarity={initCalls:[],init(id){this.initCalls.push(id)}};
+  const state={pathname:"/dashboard/platform-connections/tracking",consent:"granted",requests:0,stops:0};
+  const browser={
+    __clarityInitialized:false,location:{pathname:"/ar"},
+    localStorage:{getItem:()=>state.consent},
+    clarity:(event)=>{if(event==="stop")state.stops++},
+  };
+  const doc={scripts:[]};
+  const component={exports:{}};
+  const mocks={
+    react:{useEffect:(fn)=>fn()},
+    "next/navigation":{usePathname:()=>state.pathname},
+    "@microsoft/clarity":{__esModule:true,default:Clarity},
+    "@/lib/tracking/provider-runtime-policy":{validateClarityProjectId},
+    "@/lib/tracking/clarity-privacy-policy":{isSensitiveClarityPath,mayInitializeClarity}
+  };
+  runInNewContext(code,{module:component,exports:component.exports,
+    window:browser,document:doc,AbortController,URL,
+    fetch:async()=>{state.requests++;return {ok:true,json:async()=>({clarityProjectId:"u614k028k2",clarityEnabled:true})}},
+    require:(id)=>{if(!(id in mocks))throw Error("unexpected dependency "+id);return mocks[id]}
+  });
+  const render=component.exports.default;
+  async function settle(){for(let i=0;i<4;i++)await Promise.resolve()}
+  render();await settle();
+  assert.equal(state.requests,0);assert.equal(Clarity.initCalls.length,0);
+  state.pathname="/ar/checkout";render();await settle();
+  assert.equal(state.requests,0);assert.equal(Clarity.initCalls.length,0);
+  state.pathname="/ar";state.consent="denied";render();await settle();
+  assert.equal(state.requests,0);
+  state.consent="granted";render();await settle();
+  assert.equal(state.requests,1);assert.deepEqual(Clarity.initCalls,["u614k028k2"]);
+  state.pathname="/ar/campaigns";render();await settle();
+  assert.equal(state.requests,1);assert.equal(Clarity.initCalls.length,1);
+  state.pathname="/ar/account";render();await settle();
+  assert.equal(state.stops,1);
+});
+
 test("Clarity and GTM reject injected script and accept normalized IDs",()=>{
   for(const value of ["<script>evil()</script>","https://clarity.ms/","id onload=alert(1)","",null,42]){
     assert.equal(validateClarityProjectId(value),null);
