@@ -36,11 +36,14 @@ export async function GET(
       where: { id },
       select: { donorId: true },
     });
-    const authorized = authorizationRow && (session?.user?.id
-      ? (session.user.id === authorizationRow.donorId ||
-        userHasDashboardPermission(session.user, 'revenue') ||
-        userHasDashboardPermission(session.user, 'donationsEdit'))
-      : hasGuestReceiptGrant(request, id));
+    // A scoped receipt grant remains usable through the OAuth redirect.
+    // It authorizes only a redacted donation summary, never donor ownership.
+    const canReadAsAccount = Boolean(authorizationRow && session?.user?.id &&
+      (session.user.id === authorizationRow.donorId ||
+       userHasDashboardPermission(session.user, 'revenue') ||
+       userHasDashboardPermission(session.user, 'donationsEdit')));
+    const authorized = Boolean(authorizationRow &&
+      (canReadAsAccount || hasGuestReceiptGrant(request, id)));
     if (!authorized) {
       return NextResponse.json({ error: 'Donation unavailable' }, {
         status: 404, headers: { 'Cache-Control': 'no-store' },
@@ -116,7 +119,7 @@ export async function GET(
     // Explicit public contract: never spread Prisma's Donation or User
     // records. providerRaw, stripeChargeAttempt, gateway credentials, donor
     // account metadata and future schema fields must remain server-only.
-    const authenticated = Boolean(session?.user?.id);
+    const authenticated = canReadAsAccount;
     const response = {
       id: donation.id,
       amount: donation.amount,
