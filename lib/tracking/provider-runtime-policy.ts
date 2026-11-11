@@ -22,8 +22,10 @@ export function runtimeProviderSettings(row: ProviderConfigRow) {
   const clarityHasEnabled = row && Object.hasOwn(row, "clarityEnabled");
   const gtmHasId = row && Object.hasOwn(row, "googleTagManagerId");
   const gtmHasEnabled = row && Object.hasOwn(row, "googleTagManagerEnabled");
+  const legacyClarityId =
+    validateClarityProjectId(process.env.NEXT_PUBLIC_CLARITY_ID) ?? LEGACY_CLARITY_PROJECT_ID;
   const clarityProjectId = validateClarityProjectId(
-    clarityHasId ? row?.clarityProjectId : LEGACY_CLARITY_PROJECT_ID);
+    clarityHasId ? row?.clarityProjectId : legacyClarityId);
   const clarityEnabled = clarityHasEnabled ? row?.clarityEnabled === true : true;
   const googleTagManagerId = validateGtmContainerId(
     gtmHasId ? row?.googleTagManagerId : LEGACY_GTM_CONTAINER_ID);
