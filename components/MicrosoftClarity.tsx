@@ -72,7 +72,10 @@ export default function MicrosoftClarity() {
     const controller = new AbortController();
     if (!publicAndConsented()) {
       if (window.__clarityInitialized && !window.__clarityStopped) {
-        try { window.clarity?.("stop"); } catch { /* fail closed for subsequent starts */ }
+        try {
+          window.clarity?.("consentv2", { ad_Storage: "denied", analytics_Storage: "denied" });
+          window.clarity?.("stop");
+        } catch { /* provider network shutdown still requires staging evidence */ }
         window.__clarityStopped = true;
       }
       return;
@@ -88,7 +91,10 @@ export default function MicrosoftClarity() {
       if (controller.signal.aborted || !publicAndConsented() ||
           !settings?.clarityEnabled || !id) {
         if (window.__clarityInitialized && !window.__clarityStopped) {
-          try { window.clarity?.("stop"); } catch {}
+          try {
+            window.clarity?.("consentv2", { ad_Storage: "denied", analytics_Storage: "denied" });
+            window.clarity?.("stop");
+          } catch {}
           window.__clarityStopped = true;
         }
         return;
@@ -99,6 +105,7 @@ export default function MicrosoftClarity() {
         if (window.__clarityStopped && publicAndConsented()) {
           try {
             if (typeof window.clarity !== "function") return;
+            window.clarity("consentv2", { ad_Storage: "denied", analytics_Storage: "granted" });
             window.clarity("start");
             window.__clarityStopped = false;
           } catch { /* do not mark a failed start successful */ }
@@ -111,6 +118,7 @@ export default function MicrosoftClarity() {
       }
       if (!publicAndConsented() || controller.signal.aborted) return;
       Clarity.init(id);
+      window.clarity?.("consentv2", { ad_Storage: "denied", analytics_Storage: "granted" });
       window.__clarityInitialized = true;
       window.__clarityStopped = false;
       window.__clarityProjectId = id;
