@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
-import { linkGuestUserToTarget } from "@/lib/users/link-guest";
+import { linkOneGuestDonationToTarget } from "@/lib/users/link-one-guest-donation";
 import { hasGuestClaimGrant } from "@/lib/donations/guest-payment-grant";
 
 /** Only the original guest browser with an unexpired scoped, signed claim
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Donation unavailable" }, { status: 404 });
     }
 
-    const result = await linkGuestUserToTarget(donation.donorId, session.user.id);
+    const result = await linkOneGuestDonationToTarget(donationId, donation.donorId, session.user.id);
     if (!result.ok) {
       const status = result.reason === "GUEST_NOT_ELIGIBLE" ? 409 : 400;
       return NextResponse.json({ error: result.reason }, { status });
