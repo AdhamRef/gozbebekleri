@@ -2,14 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
-<<<<<<< HEAD
 import { isValidLocale } from "@/lib/locales";
 import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
-import { writeAuditLog, auditActorFromSiteSession, auditStreamForRole } from "@/lib/audit-log";
-=======
-import { isValidLocale } from "@/lib/ported-systems/locales";
 import { writeAuditLog, auditActorFromSiteSession } from "@/lib/audit-log";
->>>>>>> 0105005cbfa07b521cbc3975080ccdd7c68fc842
 import {
   isMessageSubject,
   type MessageSubject,

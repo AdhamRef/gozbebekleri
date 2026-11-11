@@ -1,0 +1,41 @@
+name: Donation PUT access hotfix HTTP
+on:
+  push:
+    branches: [hotfix/donation-put-owner-auth-20261110]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  isolated-put:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mongodb://127.0.0.1:27018/isolated_auth_fixture
+      NEXTAUTH_SECRET: isolated-test-only
+      STRIPE_SECRET_KEY: sk_test_fixture_no_network
+      GOOGLE_CLIENT_ID: fixture-client
+      GOOGLE_CLIENT_SECRET: fixture-secret
+    steps:
+      - name: Fetch exact GitHub event archive (legacy main contains invalid gitlink)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'header = "Authorization: Bearer %s"\n' "$GH_TOKEN" |
+            curl --fail --silent --show-error --location --config - \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
+              --output source.tgz
+          tar -xzf source.tgz --strip-components=1
+          rm source.tgz
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - name: HTTP PUT owner and unauthorized caller regression
+        run: node --conditions=react-server --import tsx scripts/qa-donation-put-hotfix-http.mjs
+
+      - name: HTTP contact messages conflict resolution regression
+        run: node --conditions=react-server --import tsx scripts/qa-message-hotfix-http.mjs
