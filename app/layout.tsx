@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import localFont from "next/font/local";
-import DeferredGTM from "@/components/DeferredGTM";
 import MicrosoftClarity from "@/components/MicrosoftClarity";
 import EngagementInstrumentation from "@/components/EngagementInstrumentation";
 import { Analytics } from "@vercel/analytics/next";
@@ -287,14 +286,6 @@ export default function RootLayout({
       <body
         className={`${poppins.variable} ${notoKufiArabic.variable} font-arabic antialiased`}
       >
-        <noscript>
-          <iframe
-            src="https://www.googletagmanager.com/ns.html?id=GTM-MMNBQQWB"
-            height="0"
-            width="0"
-            style={{ display: "none", visibility: "hidden" }}
-          />
-        </noscript>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
@@ -316,7 +307,6 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <EngagementInstrumentation />
         </Suspense>
-        <DeferredGTM />
         <Analytics />
       </body>
     </html>
