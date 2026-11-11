@@ -1,0 +1,62 @@
+name: QA GET PUT guest access integration
+on:
+  push:
+    branches: [qa/get-put-guest-security-integration-20261111]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mongodb://127.0.0.1:27018/qa_only_no_external_db
+      NEXTAUTH_SECRET: synthetic-test-only
+      STRIPE_SECRET_KEY: sk_test_fixture_no_network
+      GOOGLE_CLIENT_ID: qa-client
+      GOOGLE_CLIENT_SECRET: qa-secret
+    steps:
+      - name: Fetch exact commit archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'header = "Authorization: Bearer %s"\n' "$GH_TOKEN" |
+            curl --fail --silent --show-error --location --config - \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" --output source.tgz
+          tar -xzf source.tgz --strip-components=1
+          rm source.tgz
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - name: Read-only GET access and concurrent requests
+        run: node --conditions=react-server --import tsx scripts/qa-donation-get-guest-http-isolated.mjs
+      - name: PUT authorization, future fields and committed update failures
+        run: node --conditions=react-server --import tsx scripts/qa-donation-put-hotfix-http.mjs
+      - name: Cryptographic guest capabilities
+        run: node --conditions=react-server --import tsx scripts/qa-guest-receipt-capability.mjs
+      - name: Guest OAuth linking
+        run: node --conditions=react-server --import tsx scripts/qa-guest-oauth-link-http.mjs
+      - name: Messages conflict resolution
+        run: node --conditions=react-server --import tsx scripts/qa-message-hotfix-http.mjs
+      - name: Full app TypeScript evidence (may expose inherited main defects)
+        id: typescript
+        continue-on-error: true
+        run: npx tsc --noEmit --pretty false
+      - name: Full Next.js build evidence without production integrations
+        id: build
+        continue-on-error: true
+        env:
+          SKIP_ENV_VALIDATION: "true"
+        run: npm run build
+      - name: Publish evidence of incomplete build or TypeScript checks
+        if: always()
+        run: |
+          echo "typescript_step=${{ steps.typescript.outcome }}"
+          echo "build_step=${{ steps.build.outcome }}"
+          if [[ "${{ steps.typescript.outcome }}" != "success" || "${{ steps.build.outcome }}" != "success" ]]; then
+            echo "QA NO-GO: full build/typecheck not proven"; exit 1
+          fi
