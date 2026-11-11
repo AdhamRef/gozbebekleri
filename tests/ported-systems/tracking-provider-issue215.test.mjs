@@ -118,6 +118,7 @@ test("Clarity rejects donor identifiers in URLs before any recorder is loaded",(
   for (const search of [
     "?email=someone%40fixture.invalid", "?payment_token=example", "?donationId=abc",
     "?receipt=abc", "?client_secret=abc", "?session_id=abc", "?note=pi_abcdef",
+    "?code=private", "?sessionId=private", "?q=private", "?page=2",
   ]) {
     assert.equal(isSensitiveClarityQuery(search),true,search);
     assert.equal(mayInitializeClarity("/ar/campaigns","granted",search),false,search);
