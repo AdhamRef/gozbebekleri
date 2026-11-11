@@ -1,5 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+
+test("privacy UI is explicit and no unconditional root or locale recorder is mounted", async () => {
+  const { readFileSync } = await import("node:fs");
+  const read = path => readFileSync(path, "utf8");
+  const root = read("app/layout.tsx");
+  const locale = read("app/[locale]/layout.tsx");
+  const consent = read("components/SessionRecordingConsent.tsx");
+  const pixels = read("components/TrackingPixels.tsx");
+  const engagement = read("lib/analytics.ts");
+  assert.doesNotMatch(root, /<script[^>]+contentsquare/i);
+  assert.doesNotMatch(root, /<Analytics\s*\/>/);
+  assert.doesNotMatch(locale, /<Analytics\s*\/>/);
+  assert.doesNotMatch(locale, /<SpeedInsights\s*\/>/);
+  assert.match(root, /<SessionRecordingConsent\s*\/>/);
+  assert.match(consent, /goz_analytics_consent/);
+  assert.match(consent, /choose\("granted"\)/);
+  assert.match(consent, /choose\("denied"\)/);
+  assert.match(consent, /window\.location\.reload\(\)/);
+  assert.match(pixels, /localStorage\.getItem\("goz_analytics_consent"\) !== "granted"/);
+  assert.match(engagement, /mayInitializeClarity/);
+});
+
 const providerModule = await import("../../lib/tracking/provider-runtime-policy.ts");
 const loaderModule = await import("../../lib/tracking/google-script-policy.ts");
 const {
