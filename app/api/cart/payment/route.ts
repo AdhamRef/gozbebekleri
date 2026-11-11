@@ -1,3 +1,4 @@
+import { canIssueGuestPaymentGrant, issueGuestPaymentGrant, issueGuestReceiptGrant, issueGuestClaimGrant } from "@/lib/donations/guest-payment-grant";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
@@ -98,6 +99,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    // Guest checkout must have working signed access credentials before creating a row.
+    // Never accept donation ID alone as proof of access.
+    if (!session?.user?.id && !canIssueGuestPaymentGrant()) {
+      return NextResponse.json({ error: "Guest access unavailable" }, { status: 503 });
+    }
+
 
     const body = await request.json();
     const {
@@ -341,11 +348,17 @@ export async function POST(request: NextRequest) {
         stream: auditStreamForRole(actorRole),
       });
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         subscription: result.subscription,
         donation: result.donation,
       });
+      if (!session?.user?.id) {
+        issueGuestPaymentGrant(response, result.donation.id);
+        issueGuestReceiptGrant(response, result.donation.id);
+        issueGuestClaimGrant(response, result.donation.id);
+      }
+      return response;
     }
 
     const donation = await prisma.$transaction(async (tx) => {
@@ -411,10 +424,13 @@ export async function POST(request: NextRequest) {
       stream: auditStreamForRole(actorRole),
     });
 
-    return NextResponse.json({
-      success: true,
-      donation,
-    });
+    const response = NextResponse.json({ success: true, donation });
+    if (!session?.user?.id) {
+      issueGuestPaymentGrant(response, donation.id);
+      issueGuestReceiptGrant(response, donation.id);
+      issueGuestClaimGrant(response, donation.id);
+    }
+    return response;
   } catch (error) {
     console.error("Error creating donation:", error);
     return NextResponse.json(

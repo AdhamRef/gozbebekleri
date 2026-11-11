@@ -1,10 +1,10 @@
-import { after } from "next/server";
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
 import { Prisma, SubscriptionStatus } from '@prisma/client';
 import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
+import { hasGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
 import { isRevenueDashboardUser } from '@/lib/dashboard/api-auth';
 import { convertAmountInCurrencyToUsd, normalizeDonationCurrencyCode } from '@/lib/exchange/convert-amount-in-currency-to-usd';
 import {
@@ -13,76 +13,10 @@ import {
   auditActorFromSiteSession,
   auditStreamForRole,
 } from '@/lib/audit-log';
-import Stripe from 'stripe';
-import { dispatchDonationPaid } from "@/lib/events/dispatch";
 import {
   recomputeCampaignCurrentAmount as sharedRecomputeCampaign,
   recomputeCategoryCurrentAmount as sharedRecomputeCategory,
 } from "@/lib/campaign/current-amount";
-
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-03-25.dahlia' })
-  : null;
-
-/**
- * Self-heal donations whose webhook never landed: if Stripe already has the
- * PaymentIntent marked succeeded, set paidAt and increment campaign/category
- * totals. Idempotent — a paidAt guard inside the transaction prevents double
- * increments if the webhook arrives between the Stripe lookup and the update.
- */
-async function reconcileStripeDonation(donationId: string) {
-  if (!stripe) return;
-  const row = await prisma.donation.findUnique({
-    where: { id: donationId },
-    select: { provider: true, providerOrderId: true, paidAt: true },
-  });
-  if (!row || row.paidAt || row.provider !== 'STRIPE' || !row.providerOrderId) return;
-  if (!row.providerOrderId.startsWith('pi_')) return;
-
-  let intent: Stripe.PaymentIntent;
-  try {
-    intent = await stripe.paymentIntents.retrieve(row.providerOrderId);
-  } catch (err) {
-    console.error('[donation reconcile] Stripe retrieve failed:', err);
-    return;
-  }
-  if (intent.status !== 'succeeded') return;
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      const fresh = await tx.donation.findUnique({
-        where: { id: donationId },
-        include: { items: true, categoryItems: true },
-      });
-      if (!fresh || fresh.paidAt) return;
-
-      await tx.donation.update({
-        where: { id: donationId },
-        data: {
-          status: 'PAID',
-          paidAt: new Date(),
-          providerAuthCode: intent.id,
-          providerTxnResult: 'Success',
-        },
-      });
-      for (const item of fresh.items) {
-        await tx.campaign.update({
-          where: { id: item.campaignId },
-          data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-        });
-      }
-      for (const item of fresh.categoryItems) {
-        await tx.category.update({
-          where: { id: item.categoryId },
-          data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-        });
-      }
-    });
-    after(() => dispatchDonationPaid(donationId));
-  } catch (err) {
-    console.error('[donation reconcile] Finalize failed:', err);
-  }
-}
 
 // GET /api/donations/[id] - Get donation (transaction) by ID; include type/status from subscription when applicable
 export async function GET(
@@ -94,13 +28,29 @@ export async function GET(
     if (!id) {
       return NextResponse.json({ error: 'Donation ID required' }, { status: 400 });
     }
+    if (!/^[0-9a-f]{24}$/i.test(id)) {
+      return NextResponse.json({ error: 'Donation unavailable' }, { status: 404 });
+    }
     const session = await getServerSession(authOptions);
+    const authorizationRow = await prisma.donation.findUnique({
+      where: { id },
+      select: { donorId: true },
+    });
+    // A scoped receipt grant remains usable through the OAuth redirect.
+    // It authorizes only a redacted donation summary, never donor ownership.
+    const canReadAsAccount = Boolean(authorizationRow && session?.user?.id &&
+      (session.user.id === authorizationRow.donorId ||
+       userHasDashboardPermission(session.user, 'revenue') ||
+       userHasDashboardPermission(session.user, 'donationsEdit')));
+    const authorized = Boolean(authorizationRow &&
+      (canReadAsAccount || hasGuestReceiptGrant(request, id)));
+    if (!authorized) {
+      return NextResponse.json({ error: 'Donation unavailable' }, {
+        status: 404, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
 
-    // Self-heal: if Stripe already confirmed the payment but the webhook
-    // hasn't landed yet (common in dev / with slow webhook delivery), finalize
-    // the donation and increment campaign totals here so the success page
-    // reflects reality. Safe for guests and logged-in donors alike.
-    await reconcileStripeDonation(id);
+    // Read-only API: settlement and Stripe recovery belong to verified server paths.
 
     const donation = await prisma.donation.findUnique({
       where: { id },
@@ -165,33 +115,62 @@ export async function GET(
       );
     }
 
-    // Guest donations have no session — the unguessable donation id acts as
-    // the access token (same posture as Stripe checkout session IDs). For
-    // authenticated users, still require ownership or revenue-dashboard
-    // permission to prevent cross-account snooping.
-    if (session) {
-      const canViewAllDonations =
-        userHasDashboardPermission(session.user, 'revenue') ||
-        userHasDashboardPermission(session.user, 'donationsEdit');
-      if (!canViewAllDonations && session.user.id !== donation.donorId) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    }
-
     const sub = donation.subscription;
+    // Explicit public contract: never spread Prisma's Donation or User
+    // records. providerRaw, stripeChargeAttempt, gateway credentials, donor
+    // account metadata and future schema fields must remain server-only.
+    const authenticated = canReadAsAccount;
     const response = {
-      ...donation,
-      type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
-      // Default to CARD on read for legacy rows where the field was never
-      // written. Every current create path sets CARD or PAYPAL explicitly,
-      // so this only kicks in for historical donations.
+      id: donation.id,
+      amount: donation.amount,
+      totalAmount: donation.totalAmount,
+      currency: donation.currency,
+      status: donation.status,
+      paidAt: donation.paidAt,
+      createdAt: donation.createdAt,
       paymentMethod: donation.paymentMethod ?? 'CARD',
+      provider: donation.provider,
+      subscriptionId: donation.subscriptionId,
+      donor: authenticated ? {
+        id: donation.donor?.id ?? null,
+        name: donation.donor?.name ?? null,
+        email: donation.donor?.email ?? null,
+      } : {
+        id: null,
+        name: 'Donor',
+        email: null,
+      },
+      items: donation.items.map(item => ({
+        id: item.id,
+        campaignId: item.campaignId,
+        amount: item.amount,
+        campaign: item.campaign ? {
+          title: item.campaign.title,
+          images: item.campaign.images,
+          translations: item.campaign.translations.map(t => ({
+            locale: t.locale, title: t.title,
+          })),
+        } : null,
+      })),
+      categoryItems: donation.categoryItems.map(item => ({
+        id: item.id,
+        categoryId: item.categoryId,
+        amount: item.amount,
+        category: item.category ? {
+          name: item.category.name,
+          image: item.category.image,
+          translations: item.category.translations.map(t => ({
+            locale: t.locale, name: t.name,
+          })),
+        } : null,
+      })),
+      type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       paymentStatus: donation.status,
       subscriptionStatus: sub?.status ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
       lastBillingDate: sub?.lastBillingDate ?? null,
     };
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Error fetching donation:', error);
     return NextResponse.json(
@@ -218,7 +197,10 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const { status } = body;
 
     const currentDonation = await prisma.donation.findUnique({
@@ -238,8 +220,20 @@ export async function PUT(
       );
     }
 
-    const isAdmin = isRevenueDashboardUser(session);
+    // Revenue-only access is READ access. Subscription mutation needs the
+    // explicit donationsEdit permission, or ownership with limited actions.
+    const isAdmin = session.user.role === 'ADMIN';
+    const canReadFinancial = isRevenueDashboardUser(session);
+    const canEditFinancial = userHasDashboardPermission(session.user, 'donationsEdit');
     const isOwner = session.user.id === currentDonation.donorId;
+
+    // Check server-side authorization before empty-update read responses,
+    // subscription details, or any mutable operation.
+    if (!canReadFinancial && !canEditFinancial && !isOwner) {
+      return NextResponse.json({ error: 'Forbidden' }, {
+        status: 403, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
 
     if (!currentDonation.subscriptionId) {
       return NextResponse.json(
@@ -267,10 +261,73 @@ export async function PUT(
       updates.status = status as SubscriptionStatus;
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length > 0) {
+      // A STAFF member granted 'revenue' can read the monthly record but
+      // must not change it unless separately granted 'donationsEdit'.
+      if (!isOwner && !canEditFinancial) {
+        return NextResponse.json({ error: 'Forbidden' }, {
+          status: 403, headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+      // Cancellation always requires ADMIN; donor and STAFF edit permission
+      // alone must not upgrade to the destructive cancellation privilege.
+      if (status === 'CANCELLED' && !isAdmin) {
+        return NextResponse.json({ error: 'Forbidden' }, {
+          status: 403, headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+    }
+
+    // Public subscription contract: explicit fields only, including nested records.
+    // Never spread a Prisma Donation row: new internal fields must stay private.
+    const safeSubscriptionResponse = (row: {
+      id: string; amount?: unknown; totalAmount?: unknown; currency?: unknown;
+      paidAt?: unknown; createdAt?: unknown; paymentMethod?: unknown;
+      subscriptionId?: string | null; donor?: { name?: string | null; email?: string | null; image?: string | null } | null;
+      items?: Array<{ id?: unknown; campaignId?: unknown; amount?: unknown; campaign?: unknown }>; categoryItems?: Array<{ id?: unknown; categoryId?: unknown; amount?: unknown; category?: unknown }>;
+      subscription?: { status?: string | null; nextBillingDate?: Date | null; lastBillingDate?: Date | null } | null;
+    }) => ({
+      id: row.id,
+      amount: row.amount,
+      totalAmount: row.totalAmount,
+      currency: row.currency,
+      paidAt: row.paidAt,
+      createdAt: row.createdAt,
+      paymentMethod: row.paymentMethod ?? 'CARD',
+      subscriptionId: row.subscriptionId ?? null,
+      donor: row.donor ? { name: row.donor.name ?? null, email: row.donor.email ?? null, image: row.donor.image ?? null } : null,
+      items: (row.items ?? []).map((item) => ({
+        id: item.id, campaignId: item.campaignId, amount: item.amount,
+        campaign: item.campaign && typeof item.campaign === 'object' ? (() => {
+          const campaign = item.campaign as Record<string, unknown>;
+          return { title: campaign.title, images: campaign.images,
+            translations: Array.isArray(campaign.translations) ? campaign.translations.map((entry: Record<string, unknown>) => ({
+              locale: entry.locale, title: entry.title,
+            })) : [] };
+        })() : null,
+      })),
+      categoryItems: (row.categoryItems ?? []).map((item) => ({
+        id: item.id, categoryId: item.categoryId, amount: item.amount,
+        category: item.category && typeof item.category === 'object' ? (() => {
+          const category = item.category as Record<string, unknown>;
+          return { name: category.name, image: category.image,
+            translations: Array.isArray(category.translations) ? category.translations.map((entry: Record<string, unknown>) => ({
+              locale: entry.locale, name: entry.name,
+            })) : [] };
+        })() : null,
+      })),
+      type: 'MONTHLY' as const,
+      // Legacy API contract: top-level status is the subscription state.
+      status: row.subscription?.status ?? null,
+      nextBillingDate: row.subscription?.nextBillingDate ?? null,
+      lastBillingDate: row.subscription?.lastBillingDate ?? null,
+    });
+    const responseHeaders = { 'Cache-Control': 'private, no-store' };
+
+    if (Object.keys(updates).length === 0 || sub.status === status) {
+      // An identical update is a safe replay; return the state without a write.
       const out = await prisma.donation.findUnique({
-        where: { id },
-        omit: { cardDetails: true },
+        where: { id }, omit: { cardDetails: true },
         include: {
           donor: { select: { name: true, email: true, image: true } },
           subscription: { select: { status: true, nextBillingDate: true, lastBillingDate: true } },
@@ -278,82 +335,69 @@ export async function PUT(
           categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
         },
       });
-      if (!out) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-      const s = out.subscription;
-      return NextResponse.json({
-        ...out,
-        type: 'MONTHLY' as const,
-        status: s?.status ?? null,
-        nextBillingDate: s?.nextBillingDate ?? null,
-        lastBillingDate: s?.lastBillingDate ?? null,
-      });
+      if (!out) return NextResponse.json({ error: 'Donation unavailable' }, { status: 404 });
+      return NextResponse.json(safeSubscriptionResponse(out), { headers: responseHeaders });
     }
 
-    if (!isAdmin && !isOwner) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
-
-    if (!isAdmin && isOwner && status === 'CANCELLED') {
-      return NextResponse.json(
-        { error: 'Only admin can cancel a subscription' },
-        { status: 403 }
-      );
-    }
-
-    await prisma.subscription.update({
-      where: { id: currentDonation.subscriptionId },
+    // Compare-and-set prevents concurrent requests from overwriting one
+    // another after both read the same subscription state. The caller must
+    // refresh GET when another operation wins the race.
+    const writeResult = await prisma.subscription.updateMany({
+      where: { id: currentDonation.subscriptionId!, status: sub.status },
       data: updates,
     });
-
-    const subActor = isAdmin
-      ? auditActorFromDashboardSession(session!)
-      : auditActorFromSiteSession(session!);
-    const subStream = isAdmin
-      ? ("TEAM" as const)
-      : auditStreamForRole(subActor.actorRole);
-    await writeAuditLog({
-      ...subActor,
-      action: "SUBSCRIPTION_UPDATE",
-      messageAr: `${subActor.actorName ?? "مستخدم"} عدّل الاشتراك الشهري المرتبط بالتبرع (${Object.keys(updates).join("، ")})`,
-      entityType: "Subscription",
-      entityId: currentDonation.subscriptionId!,
-      metadata: {
-        donationId: id,
-        ...(updates.status !== undefined && { status: updates.status }),
-      },
-      stream: subStream,
-    });
-
-    const updatedDonation = await prisma.donation.findUnique({
-      where: { id },
-      omit: { cardDetails: true },
-      include: {
-        donor: { select: { name: true, email: true, image: true } },
-        subscription: { select: { status: true, nextBillingDate: true, lastBillingDate: true } },
-        items: { include: { campaign: { select: { title: true, images: true, translations: { select: { locale: true, title: true } } } } } },
-        categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
-      },
-    });
-
-    if (!updatedDonation) {
-      return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
+    if (writeResult.count !== 1) {
+      return NextResponse.json({ error: 'SUBSCRIPTION_STATE_CONFLICT' }, {
+        status: 409, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+    const updatedSubscription = { ...sub, status: updates.status ?? sub.status };
+    try {
+      const subActor = isAdmin
+        ? auditActorFromDashboardSession(session!)
+        : auditActorFromSiteSession(session!);
+      await writeAuditLog({
+        ...subActor,
+        action: "SUBSCRIPTION_UPDATE",
+        messageAr: `${subActor.actorName ?? "مستخدم"} عدّل الاشتراك الشهري المرتبط بالتبرع (status)`,
+        entityType: "Subscription", entityId: currentDonation.subscriptionId!,
+        metadata: { donationId: id, status: updates.status },
+        stream: isAdmin ? ("TEAM" as const) : auditStreamForRole(subActor.actorRole),
+      });
+    } catch (auditError) {
+      // Record the operational failure, but do not misreport the committed write.
+      console.error('Subscription updated; audit log failed:', auditError);
     }
 
-    const s = updatedDonation.subscription;
-    return NextResponse.json({
-      ...updatedDonation,
-      type: 'MONTHLY' as const,
-      status: s?.status ?? null,
-      nextBillingDate: s?.nextBillingDate ?? null,
-      lastBillingDate: s?.lastBillingDate ?? null,
-    });
+    try {
+      const updatedDonation = await prisma.donation.findUnique({
+        where: { id }, omit: { cardDetails: true },
+        include: {
+          donor: { select: { name: true, email: true, image: true } },
+          subscription: { select: { status: true, nextBillingDate: true, lastBillingDate: true } },
+          items: { include: { campaign: { select: { title: true, images: true, translations: { select: { locale: true, title: true } } } } } },
+          categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
+        },
+      });
+      if (updatedDonation) return NextResponse.json(safeSubscriptionResponse(updatedDonation), { headers: responseHeaders });
+    } catch (readError) {
+      console.error('Subscription updated; response reload failed:', readError);
+    }
+    // The update was committed. Respond with the confirmed subscription result,
+    // never an unverified 500 or an unfiltered donation object.
+    return NextResponse.json(safeSubscriptionResponse({
+      id: currentDonation.id,
+      subscriptionId: currentDonation.subscriptionId,
+      subscription: {
+        status: updatedSubscription.status,
+        nextBillingDate: updatedSubscription.nextBillingDate,
+        lastBillingDate: updatedSubscription.lastBillingDate,
+      },
+    }), { headers: responseHeaders });
   } catch (error) {
     console.error('Error updating donation:', error);
     return NextResponse.json(
-      { error: 'Failed to update donation', details: (error as Error).message },
+      { error: 'Failed to update donation' },
       { status: 500 }
     );
   }

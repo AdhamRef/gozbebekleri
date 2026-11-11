@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
+import { hasGuestPaymentGrant } from "@/lib/donations/guest-payment-grant";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -19,9 +20,19 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json() as { donationId?: string; locale?: string };
     const donationId = String(body.donationId || "").trim();
-
-    if (!donationId) {
-      return NextResponse.json({ error: "donationId is required" }, { status: 400 });
+    if (!/^[0-9a-f]{24}$/i.test(donationId)) {
+      return NextResponse.json({ error: "Donation unavailable" }, { status: 404 });
+    }
+    // Mutating payment creation must never accept a publicly shared donation ID.
+    // Same-origin check defends cookie-bearing requests against cross-site initiation.
+    const origin = req.headers.get("origin");
+    if (!origin || origin !== req.nextUrl.origin) {
+      return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
+    }
+    if (!session?.user?.id && !hasGuestPaymentGrant(req, donationId)) {
+      return NextResponse.json({ error: "Payment authorization required" }, {
+        status: 403, headers: { "Cache-Control": "no-store" },
+      });
     }
 
     const donation = await prisma.donation.findUnique({
@@ -35,7 +46,7 @@ export async function POST(req: NextRequest) {
     if (!donation) {
       return NextResponse.json({ error: "Donation not found" }, { status: 404 });
     }
-    // Authenticated users: verify ownership. Guests have no session — trust the donationId.
+    // Account ownership is checked even if an unrelated guest cookie is present.
     if (session?.user?.id && donation.donorId !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

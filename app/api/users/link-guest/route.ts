@@ -2,19 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
-import { linkGuestUserToTarget } from "@/lib/users/link-guest";
+import { linkOneGuestDonationToTarget } from "@/lib/users/link-one-guest-donation";
+import { hasGuestClaimGrant } from "@/lib/donations/guest-payment-grant";
 
-/**
- * Attach a guest-created donation (and every other guest donation under the
- * same anonymous user record) to the currently authenticated user.
- *
- * The donation id is treated as a bearer token here — exactly like
- * /api/donations/[id] does — because the only way the caller learned about
- * the id is by being the donor on the success page (or following an email
- * link sent to that donor). The linkGuestUserToTarget helper then refuses
- * to merge anything that has a password or a linked OAuth account, so the
- * worst a hostile caller can do with a stolen donation id is steal donations
- * that have never been claimed by any real account.
+/** Only the original guest browser with an unexpired scoped, signed claim
+ * cookie may link that guest's donation after verified account sign-in.
+ * Donation IDs are public identifiers and cannot authorize ownership changes.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -23,10 +16,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const origin = req.headers.get("origin");
+    if (!origin || origin !== req.nextUrl.origin) {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    }
     const body = (await req.json().catch(() => null)) as { donationId?: string } | null;
     const donationId = body?.donationId?.trim();
-    if (!donationId) {
-      return NextResponse.json({ error: "donationId is required" }, { status: 400 });
+    if (!donationId || !/^[0-9a-f]{24}$/i.test(donationId)) {
+      return NextResponse.json({ error: "Invalid donation" }, { status: 400 });
+    }
+    if (!hasGuestClaimGrant(req, donationId)) {
+      return NextResponse.json({ error: "Claim authorization required" }, {
+        status: 403, headers: { "Cache-Control": "no-store" },
+      });
     }
 
     const donation = await prisma.donation.findUnique({
@@ -34,10 +36,10 @@ export async function POST(req: NextRequest) {
       select: { donorId: true },
     });
     if (!donation) {
-      return NextResponse.json({ error: "Donation not found" }, { status: 404 });
+      return NextResponse.json({ error: "Donation unavailable" }, { status: 404 });
     }
 
-    const result = await linkGuestUserToTarget(donation.donorId, session.user.id);
+    const result = await linkOneGuestDonationToTarget(donationId, donation.donorId, session.user.id);
     if (!result.ok) {
       const status = result.reason === "GUEST_NOT_ELIGIBLE" ? 409 : 400;
       return NextResponse.json({ error: result.reason }, { status });
