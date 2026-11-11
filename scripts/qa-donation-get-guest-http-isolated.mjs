@@ -174,6 +174,49 @@ try{
  assert.equal(afterWrite.payload.subscriptionStatus,"PAUSED");
  pass("20 concurrent GET with authorized PUT performs exactly one write and zero Stripe calls");
 
+ if(process.env.QA_CHROMIUM==="1"){
+   const {chromium}=await import("playwright");
+   const browser=await chromium.launch({headless:true,args:["--no-sandbox"]});
+   try {
+     state.session=null;
+     const context=await browser.newContext();
+     const page=await context.newPage();
+     let nav=await page.goto(endpoint);
+     assert.equal(nav.status(),404,"Uncredentialed real Chromium rejects donation lookup");
+     const [cookieName,cookieValue]=cookie.split("=");
+     await context.addCookies([{
+       name:cookieName,value:cookieValue,
+       domain:"127.0.0.1",path:"/api/donations/"+donationId,
+       httpOnly:true,sameSite:"Lax",secure:false,
+     }]);
+     nav=await page.goto(endpoint);
+     assert.equal(nav.status(),200,"Scoped HttpOnly guest cookie authorizes real Chromium");
+     const payload=JSON.parse(await page.locator("body").innerText());
+     assert.equal(payload.donor.id,null);
+     assert.equal(payload.donor.email,null);
+     assert.equal(payload.providerOrderId,undefined);
+     assert.equal(payload.subscriptionStatus,"PAUSED");
+     state.session={user:{id:owner,role:"DONOR"}};
+     const browserPut=await page.evaluate(async()=> {
+       const response=await fetch(location.href,{
+         method:"PUT",headers:{"content-type":"application/json"},
+         body:JSON.stringify({status:"ACTIVE"}),
+       });
+       return {status:response.status,data:await response.json()};
+     });
+     assert.equal(browserPut.status,200,JSON.stringify(browserPut));
+     assert.equal(browserPut.data.status,"ACTIVE");
+     const browserRead=await page.evaluate(async()=> {
+       const response=await fetch(location.href);
+       return {status:response.status,data:await response.json()};
+     });
+     assert.equal(browserRead.status,200);
+     assert.equal(browserRead.data.subscriptionStatus,"ACTIVE");
+     assert.equal(state.stripeCalls,0);
+     pass("Real Chromium guest cookie, denied anonymous GET, redacted response and owner PUT/GET");
+     await context.close();
+   }finally{await browser.close()}
+ }
  console.log(JSON.stringify({summary:"DONATION_ACCESS_HTTP_PASS",passed,readCalls:state.reads,writes:state.writes,stripeCalls:state.stripeCalls}));
 } finally {
  await new Promise(ok=>server.close(ok));
