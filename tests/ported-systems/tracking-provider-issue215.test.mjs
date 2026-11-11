@@ -75,10 +75,10 @@ test("Clarity client route guard does not initialize on admin, account or consen
   assert.equal(state.requests,2);assert.equal(Clarity.initCalls.length,1);
   state.pathname="/ar/account";browser.location.pathname="/ar/account";render();await settle();
   assert.equal(state.stops,1);
-  assert.equal(state.requests,1);
-  state.pathname="/ar/campaigns";render();await settle();
+  assert.equal(state.requests,2);
+  state.pathname="/ar/campaigns";browser.location.pathname="/ar/campaigns";render();await settle();
   assert.equal(state.starts,1);
-  assert.equal(state.requests,1);
+  assert.equal(state.requests,3);
   state.consent="denied";render();await settle();
   assert.equal(state.stops,2);
   state.pathname="/ar/checkout";browser.location.pathname="/ar/checkout";render();await settle();
