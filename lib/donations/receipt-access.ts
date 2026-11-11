@@ -14,9 +14,10 @@ export function canAccessDonationReceipt(
   donationId: string,
   request: NextRequest,
 ): boolean {
-  if (user?.id) {
-    return user.id === donorId || userHasDashboardPermission(user, "revenue");
-  }
-  // A guessed donation ObjectId is not a credential.
-  return hasGuestReceiptGrant(request, donationId);
+  // OAuth return can retain an original guest receipt cookie even before
+  // the account is linked. The signed grant authorizes only this receipt,
+  // and must never imply ownership of an unrelated donor account.
+  return Boolean((user?.id &&
+    (user.id === donorId || userHasDashboardPermission(user, "revenue"))) ||
+    hasGuestReceiptGrant(request, donationId));
 }
