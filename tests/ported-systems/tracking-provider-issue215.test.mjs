@@ -41,7 +41,8 @@ test("Clarity client route guard does not initialize on admin, account or consen
   const Clarity={initCalls:[],init(id){this.initCalls.push(id)}};
   const state={pathname:"/dashboard/platform-connections/tracking",consent:"granted",requests:0,stops:0,starts:0};
   const browser={
-    __clarityInitialized:false,location:{pathname:"/ar"},
+    __clarityInitialized:false,location:{pathname:"/ar",search:""},
+    history:{pushState(){},replaceState(){}},
     addEventListener:()=>{},removeEventListener:()=>{},
     localStorage:{getItem:()=>state.consent},
     clarity:(event)=>{if(event==="stop")state.stops++;if(event==="start")state.starts++},
@@ -64,15 +65,15 @@ test("Clarity client route guard does not initialize on admin, account or consen
   async function settle(){for(let i=0;i<4;i++)await Promise.resolve()}
   render();await settle();
   assert.equal(state.requests,0);assert.equal(Clarity.initCalls.length,0);
-  state.pathname="/ar/checkout";render();await settle();
+  state.pathname="/ar/checkout";browser.location.pathname="/ar/checkout";render();await settle();
   assert.equal(state.requests,0);assert.equal(Clarity.initCalls.length,0);
-  state.pathname="/ar";state.consent="denied";render();await settle();
+  state.pathname="/ar";browser.location.pathname="/ar";state.consent="denied";render();await settle();
   assert.equal(state.requests,0);
   state.consent="granted";render();await settle();
   assert.equal(state.requests,1);assert.deepEqual(Clarity.initCalls,["u614k028k2"]);
-  state.pathname="/ar/campaigns";render();await settle();
-  assert.equal(state.requests,1);assert.equal(Clarity.initCalls.length,1);
-  state.pathname="/ar/account";render();await settle();
+  state.pathname="/ar/campaigns";browser.location.pathname="/ar/campaigns";render();await settle();
+  assert.equal(state.requests,2);assert.equal(Clarity.initCalls.length,1);
+  state.pathname="/ar/account";browser.location.pathname="/ar/account";render();await settle();
   assert.equal(state.stops,1);
   assert.equal(state.requests,1);
   state.pathname="/ar/campaigns";render();await settle();
@@ -80,11 +81,15 @@ test("Clarity client route guard does not initialize on admin, account or consen
   assert.equal(state.requests,1);
   state.consent="denied";render();await settle();
   assert.equal(state.stops,2);
-  state.pathname="/ar/checkout";render();await settle();
+  state.pathname="/ar/checkout";browser.location.pathname="/ar/checkout";render();await settle();
   assert.equal(state.starts,1);
-  state.pathname="/ar";state.consent="granted";render();await settle();
+  state.pathname="/ar";browser.location.pathname="/ar";state.consent="granted";render();await settle();
   assert.equal(state.starts,2);
   assert.equal(Clarity.initCalls.length,1);
+  browser.location.search="?payment_token=fixture";render();await settle();
+  assert.equal(state.stops,3);
+  browser.location.search="?utm_source=fixture";render();await settle();
+  assert.equal(state.starts,3);
 });
 
 test("Clarity rejects donor identifiers in URLs before any recorder is loaded",()=> {
