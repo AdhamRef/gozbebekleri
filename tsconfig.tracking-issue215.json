@@ -18,6 +18,8 @@
     "app/api/tracking/config/route.ts",
     "components/MicrosoftClarity.tsx",
     "components/TrackingPixels.tsx",
-    "app/(dashboard)/dashboard/platform-connections/tracking/_components/TrackingSettingsManager.tsx"
+    "app/(dashboard)/dashboard/platform-connections/tracking/_components/TrackingSettingsManager.tsx",
+    "components/SessionRecordingConsent.tsx",
+    "lib/analytics.ts"
   ]
 }
