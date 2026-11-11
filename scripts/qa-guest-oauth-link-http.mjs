@@ -12,14 +12,14 @@ const mocks={
  "auth.cjs":'exports.getServerSession=async()=>globalThis.oauthFixture.session;',
  "options.cjs":'exports.authOptions={};',
  "prisma.cjs":'exports.prisma=globalThis.oauthFixture.prisma;',
- "link.cjs":'exports.linkGuestUserToTarget=async(from,to)=>{globalThis.oauthFixture.linkCalls++;return globalThis.oauthFixture.linkResult||{ok:true,movedDonations:1}};',
+ "link.cjs":'exports.linkOneGuestDonationToTarget=async(donationId,from,to)=>{globalThis.oauthFixture.linkCalls++;globalThis.oauthFixture.lastClaim={donationId,from,to};return globalThis.oauthFixture.linkResult||{ok:true,movedDonations:1}};',
 };
 for(const [name,code] of Object.entries(mocks))writeFileSync(resolve(tmp,name),code);
 const aliases=new Map([
  ["next/server","next.cjs"],["next-auth","auth.cjs"],
  ["@/app/api/auth/[...nextauth]/options","options.cjs"],
  ["@/lib/prisma","prisma.cjs"],
- ["@/lib/users/link-guest","link.cjs"],
+ ["@/lib/users/link-one-guest-donation","link.cjs"],
 ]);
 registerHooks({resolve(spec,ctx,next){const name=aliases.get(spec);return name?{url:pathToFileURL(resolve(tmp,name)).href,shortCircuit:true}:next(spec,ctx)}});
 const f={session:null,linkCalls:0,linkResult:null,readCalls:0,
@@ -50,7 +50,8 @@ try {
  assert.equal(f.linkCalls,0);passed++;
  const linked=await send({session,cookie:guestCookie});
  assert.equal(linked.status,200,JSON.stringify(linked.body));
- assert.equal(linked.body.movedDonations,1);assert.equal(f.linkCalls,1);passed++;
+ assert.equal(linked.body.movedDonations,1);assert.equal(f.linkCalls,1);
+ assert.deepEqual(f.lastClaim,{donationId,from:donorId,to:userId});passed++;
  assert.equal((await send({session,cookie:guestCookie,id:"dddddddddddddddddddddddd"})).status,403);passed++;
  f.linkResult={ok:false,reason:"GUEST_NOT_ELIGIBLE"};
  assert.equal((await send({session,cookie:guestCookie})).status,409);passed++;
