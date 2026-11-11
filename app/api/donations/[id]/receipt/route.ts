@@ -1,4 +1,6 @@
 import { hasConfirmedDonationPayment } from '@/lib/donations/receipt-state';
+import { canAccessDonationReceipt } from '@/lib/donations/receipt-access';
+import { issueGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
@@ -164,8 +166,18 @@ function currencyFormat(amount: number, currency: string) {
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    if (!id) {
-      return NextResponse.json({ error: 'Donation ID required' }, { status: 400 });
+    if (!/^[0-9a-f]{24}$/i.test(id)) {
+      return NextResponse.json({ error: 'Receipt unavailable' }, { status: 404 });
+    }
+    const session = await getServerSession(authOptions);
+    const authorizationRow = await prisma.donation.findUnique({
+      where: { id },
+      select: { donorId: true },
+    });
+    if (!authorizationRow || !canAccessDonationReceipt(session?.user, authorizationRow.donorId, id, request)) {
+      return NextResponse.json({ error: 'Receipt unavailable' }, {
+        status: 404, headers: { 'Cache-Control': 'no-store' },
+      });
     }
     const requestedLocale = (request.nextUrl.searchParams.get('locale') || 'en').slice(0, 2);
     let locale = requestedLocale as LocaleKey;
@@ -194,7 +206,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!ARABIC_PDF_FONT_AVAILABLE && locale === 'ar') {
       locale = 'en';
     }
-    const session = await getServerSession(authOptions);
 
     const donationRow = await prisma.donation.findUnique({
       where: { id },
@@ -244,27 +255,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
 
     if (!donationRow) {
-      return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
-    }
-
-    // Guest donations have no session — the unguessable donation id acts as
-    // the access token. For authenticated users, keep ownership/revenue-admin
-    // enforcement to prevent cross-account receipt access.
-    if (session) {
-      const canViewReceipt =
-        userHasDashboardPermission(session.user, 'revenue') ||
-        session.user.id === donationRow.donorId;
-      if (!canViewReceipt) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
+      return NextResponse.json({ error: 'Receipt unavailable' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
     }
 
     if (!hasConfirmedDonationPayment(donationRow)) {
-      return NextResponse.json({ error: 'لم يتأكد نجاح الدفع؛ لا يمكن إصدار إيصال استلام بعد' }, { status: 409 });
+      return NextResponse.json({ error: 'Payment not confirmed' }, { status: 409, headers: { 'Cache-Control': 'no-store' } });
     }
     const sub = donationRow.subscription;
+    // A guest capability proves control of this checkout, not ownership of
+    // every personal field on a pre-existing user matched by email/phone.
+    // Never include the linked account's contact details in a guest PDF.
+    const safeDonor = session?.user?.id ? donationRow.donor : {
+      ...donationRow.donor,
+      name: 'Donor',
+      email: null,
+      phone: null,
+      country: null,
+      countryName: null,
+      countryCode: null,
+      city: null,
+      region: null,
+    };
     const donation = {
       ...donationRow,
+      donor: safeDonor,
       type: donationRow.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       status: sub?.status ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
@@ -529,11 +543,55 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
         'Content-Disposition': `attachment; filename="receipt-${receiptShortId}.pdf"`,
       },
     });
   } catch (error) {
     console.error('Error generating receipt:', error);
     return NextResponse.json({ error: 'Failed to generate receipt' }, { status: 500 });
+  }
+}
+
+
+/**
+ * Reauthorize an expired guest receipt grant ONLY after sign-in has
+ * cryptographically verified the original donor's account. This does not
+ * change donation ownership, payment status or donor records.
+ * Old guest donors without a verified sign-in must use the normal
+ * account-recovery / verified support flow; donation ID never suffices.
+ */
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!/^[0-9a-f]{24}$/i.test(id)) {
+    return NextResponse.json({ error: 'Receipt unavailable' }, { status: 404 });
+  }
+  const origin = request.headers.get('origin');
+  if (!origin || origin !== request.nextUrl.origin) {
+    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+  }
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+  try {
+    const donation = await prisma.donation.findUnique({
+      where: { id },
+      select: { donorId: true, status: true, paidAt: true },
+    });
+    if (!donation || donation.donorId !== session.user.id) {
+      return NextResponse.json({ error: 'Receipt unavailable' }, { status: 404 });
+    }
+    if (!hasConfirmedDonationPayment(donation)) {
+      return NextResponse.json({ error: 'Payment not confirmed' }, { status: 409 });
+    }
+    const response = NextResponse.json({ ok: true, expiresInSeconds: 86400 }, {
+      headers: { 'Cache-Control': 'no-store' },
+    });
+    issueGuestReceiptGrant(response, id);
+    return response;
+  } catch {
+    return NextResponse.json({ error: 'Receipt authorization unavailable' }, { status: 503 });
   }
 }
