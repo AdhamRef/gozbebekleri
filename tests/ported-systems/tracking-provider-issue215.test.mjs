@@ -10,7 +10,7 @@ const {
 const { loadConfiguredGoogleTagManager, initializeGoogleTracking } = loaderModule.default ?? loaderModule;
 
 const privacyModule = await import("../../lib/tracking/clarity-privacy-policy.ts");
-const { isSensitiveClarityPath, mayInitializeClarity } = privacyModule.default ?? privacyModule;
+const { isSensitiveClarityPath, isSensitiveClarityQuery, mayInitializeClarity } = privacyModule.default ?? privacyModule;
 
 test("Clarity fails closed without explicit consent, honors opt-out and excludes sensitive routes",()=>{
   const publicPages=["/ar","/en/campaigns","/tr/about-us","/ar/campaign/fixture"];
@@ -85,6 +85,20 @@ test("Clarity client route guard does not initialize on admin, account or consen
   state.pathname="/ar";state.consent="granted";render();await settle();
   assert.equal(state.starts,2);
   assert.equal(Clarity.initCalls.length,1);
+});
+
+test("Clarity rejects donor identifiers in URLs before any recorder is loaded",()=> {
+  for (const search of [
+    "?email=someone%40fixture.invalid", "?payment_token=example", "?donationId=abc",
+    "?receipt=abc", "?client_secret=abc", "?session_id=abc", "?note=pi_abcdef",
+  ]) {
+    assert.equal(isSensitiveClarityQuery(search),true,search);
+    assert.equal(mayInitializeClarity("/ar/campaigns","granted",search),false,search);
+  }
+  assert.equal(isSensitiveClarityQuery("?utm_source=google&utm_campaign=winter"),false);
+  assert.equal(mayInitializeClarity("/ar/campaigns","granted","?utm_source=google"),true);
+  assert.equal(isSensitiveClarityPath("/ar/donations/fixture"),true);
+  assert.equal(isSensitiveClarityPath("/en/donation/fixture"),true);
 });
 
 test("Clarity and GTM reject injected script and accept normalized IDs",()=>{
