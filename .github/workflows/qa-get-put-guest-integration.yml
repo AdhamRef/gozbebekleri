@@ -46,6 +46,8 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/qa-guest-oauth-link-http.mjs
       - name: Guest claim scope and unrelated donor isolation
         run: node --conditions=react-server --import tsx scripts/qa-guest-claim-scope.mjs
+      - name: Guest charge authorization and cross-donation protection
+        run: node --conditions=react-server --import tsx scripts/qa-guest-charge-access-http.mjs
       - name: Messages conflict resolution
         run: node --conditions=react-server --import tsx scripts/qa-message-hotfix-http.mjs
       - name: Full app TypeScript evidence (may expose inherited main defects)
