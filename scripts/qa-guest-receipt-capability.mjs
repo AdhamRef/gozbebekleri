@@ -27,7 +27,7 @@ try {
   expect(receipt.path==="/api/donations/"+id,"receipt cookie has narrow path");
   expect(hasGuestReceiptGrant(req(receipt),id),"valid receipt grant");
   expect(!hasGuestReceiptGrant(req(receipt),other),"grant must not authorize other donation");
-  expect(!hasGuestReceiptGrant(req({name:receipt.name,value:receipt.value.slice(0,-1)+"0"}),id),"tampered signature rejected");
+  expect(!hasGuestReceiptGrant(req({name:receipt.name,value:receipt.value.slice(0,-1)+(receipt.value.endsWith("0")?"1":"0")}),id),"tampered signature rejected");
   issueGuestClaimGrant(response,id);
   const claim=cookies.at(-1);
   expect(claim.path==="/api/users/link-guest","claim scoped to linking endpoint");
