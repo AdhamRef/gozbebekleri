@@ -305,7 +305,7 @@ export async function PUT(
       id: string; amount?: unknown; totalAmount?: unknown; currency?: unknown;
       paidAt?: unknown; createdAt?: unknown; paymentMethod?: unknown;
       subscriptionId?: string | null; donor?: { name?: string | null; email?: string | null; image?: string | null } | null;
-      items?: Array<Record<string, unknown>>; categoryItems?: Array<Record<string, unknown>>;
+      items?: Array<{ id?: unknown; campaignId?: unknown; amount?: unknown; campaign?: unknown }>; categoryItems?: Array<{ id?: unknown; categoryId?: unknown; amount?: unknown; category?: unknown }>;
       subscription?: { status?: string | null; nextBillingDate?: Date | null; lastBillingDate?: Date | null } | null;
     }) => ({
       id: row.id,
