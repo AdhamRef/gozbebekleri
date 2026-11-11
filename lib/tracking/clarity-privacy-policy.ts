@@ -17,7 +17,8 @@ export function isSensitiveClarityQuery(search: string): boolean {
   if (!search) return false;
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   for (const [name, value] of params) {
-    if (/(?:^|[_-])(email|phone|mobile|token|secret|password|session|auth|receipt|donation|payment|customer|client)(?:$|[_-])/i.test(name)) return true;
+    const normalizedName = name.replace(/([a-z])([A-Z])/g, "$1_$2");
+    if (/(?:^|[_-])(email|phone|mobile|token|secret|password|session|auth|receipt|donation|payment|customer|client)(?:$|[_-])/i.test(normalizedName)) return true;
     if (/@|(?:^|[^a-z])(?:pi_|cs_|sk_|pk_)/i.test(value)) return true;
   }
   return false;
