@@ -23,7 +23,7 @@ const modules={
  "permission.cjs":'exports.userHasDashboardPermission=(u,p)=>u?.role==="ADMIN"||u?.dashboardPermissions?.includes(p);',
  "admin.cjs":'exports.isRevenueDashboardUser=s=>s?.user?.role==="ADMIN"||s?.user?.dashboardPermissions?.includes("revenue");',
  "exchange.cjs":'exports.convertAmountInCurrencyToUsd=async x=>x;exports.normalizeDonationCurrencyCode=x=>x;',
- "audit.cjs":'exports.writeAuditLog=async()=>{};exports.auditActorFromDashboardSession=()=>({actorRole:"ADMIN"});exports.auditActorFromSiteSession=()=>({actorRole:"DONOR"});exports.auditStreamForRole=()=>("TEAM");',
+ "audit.cjs":'exports.writeAuditLog=async()=>{if(globalThis.fixture.failAudit)throw Error("INTERNAL_AUDIT_SECRET_MARKER")};exports.auditActorFromDashboardSession=()=>({actorRole:"ADMIN"});exports.auditActorFromSiteSession=()=>({actorRole:"DONOR"});exports.auditStreamForRole=()=>("TEAM");',
  "amount.cjs":'exports.recomputeCampaignCurrentAmount=async()=>{};exports.recomputeCategoryCurrentAmount=async()=>{};',
  "stripe.cjs":'module.exports=class Stripe{constructor(){this.paymentIntents={retrieve:async()=>{throw Error("Unexpected Stripe call")}}}};',
  "events.cjs":'exports.dispatchDonationPaid=async()=>{};',
@@ -31,16 +31,16 @@ const modules={
 };
 for(const [file,source] of Object.entries(modules))writeFileSync(resolve(dir,file),source);
 registerHooks({resolve(spec,ctx,next){const file=aliases.get(spec);return file?{url:pathToFileURL(resolve(dir,file)).href,shortCircuit:true}:next(spec,ctx)}});
-let writes=0, reads=0, failRead=false;
+let writes=0, reads=0, failRead=false, failPostUpdate=false, readFailAfter=Infinity;
 const donation={
  id,donorId:owner,subscriptionId:"dddddddddddddddddddddddd",status:"PAID",
  subscription:{id:"dddddddddddddddddddddddd",status:"ACTIVE",nextBillingDate:null,lastBillingDate:null},
- amount:20,totalAmount:20,currency:"USD",items:[],categoryItems:[],paidAt:new Date(),
+ amount:20,totalAmount:20,currency:"USD",items:[],categoryItems:[],paidAt:new Date(),futurePrivateField:"SHOULD_NOT_APPEAR_IN_API",providerRaw:"STRIPE_INTERNAL_SECRET",donor:{name:"Test",email:"test@fixture.invalid",futurePrivateField:"DONOR_INTERNAL_SECRET"},
 };
-globalThis.fixture={session:null,prisma:{
- donation:{findUnique:async({where})=>{reads++;if(failRead)throw Error("MONGO_SECRET_INTERNAL_FINANCIAL_MARKER");return where.id===id?structuredClone(donation):null;},
+globalThis.fixture={session:null,failAudit:false,prisma:{
+ donation:{findUnique:async({where})=>{reads++;if(failRead||(failPostUpdate&&reads>readFailAfter))throw Error("MONGO_SECRET_INTERNAL_FINANCIAL_MARKER");return where.id===id?structuredClone(donation):null;},
  update:async()=>{writes++;throw Error("Unexpected mutation")}},
- subscription:{update:async()=>{writes++;return{}}},
+ subscription:{update:async({data})=>{writes++;donation.subscription.status=data.status;return structuredClone(donation.subscription)}},
  $transaction:async()=>{writes++;throw Error("Unexpected transaction")},
 }};
 const {PUT}=await import("../app/api/donations/[id]/route.ts");
@@ -150,6 +150,32 @@ try{
  globalThis.fixture.session={user:{id:stranger,role:"ADMIN"}};
  assert.equal((await put({status:"CANCELLED"})).status,200);
  assert.equal(writes,3);passed++;
+ // Future Prisma fields must never leak from the normal read or write responses.
+ donation.subscription.status="ACTIVE";
+ const secured=await put({});
+ assert.equal(secured.status,200,secured.text);
+ assert.doesNotMatch(secured.text,/SHOULD_NOT_APPEAR_IN_API|STRIPE_INTERNAL_SECRET|DONOR_INTERNAL_SECRET/);passed++;
+ // A committed update must not become an unsafe 500 if audit persistence fails.
+ globalThis.fixture.failAudit=true;
+ const beforeAuditWrites=writes;
+ const auditFailure=await put({status:"PAUSED"});
+ assert.equal(auditFailure.status,200,auditFailure.text);
+ assert.equal(writes,beforeAuditWrites+1);
+ assert.doesNotMatch(auditFailure.text,/INTERNAL_AUDIT_SECRET_MARKER|STRIPE_INTERNAL_SECRET/);passed++;
+ globalThis.fixture.failAudit=false;
+ // Replaying an identical status is safe and must not create another write.
+ assert.equal((await put({status:"PAUSED"})).status,200);
+ assert.equal(writes,beforeAuditWrites+1);passed++;
+ // Simulate database failure specifically AFTER the subscription update.
+ readFailAfter=reads+1;failPostUpdate=true;
+ const beforeReloadWrites=writes;
+ const reloadFailure=await put({status:"ACTIVE"});
+ assert.equal(reloadFailure.status,200,reloadFailure.text);
+ assert.equal(writes,beforeReloadWrites+1);
+ assert.doesNotMatch(reloadFailure.text,/MONGO_SECRET_INTERNAL_FINANCIAL_MARKER|SHOULD_NOT_APPEAR_IN_API/);passed++;
+ failPostUpdate=false;
+ assert.equal((await put({status:"ACTIVE"})).status,200);
+ assert.equal(writes,beforeReloadWrites+1);passed++;
  console.log(JSON.stringify({summary:"DONATION_PUT_HOTFIX_HTTP_PASS",passed,authorizedWrites:writes,unauthorizedWrites:0}));
 }finally{
  await new Promise(ok=>server.close(ok));
