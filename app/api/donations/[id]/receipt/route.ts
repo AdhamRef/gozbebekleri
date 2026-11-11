@@ -1,5 +1,6 @@
 import { hasConfirmedDonationPayment } from '@/lib/donations/receipt-state';
 import { canAccessDonationReceipt } from '@/lib/donations/receipt-access';
+import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
 import { issueGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -265,7 +266,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // A guest capability proves control of this checkout, not ownership of
     // every personal field on a pre-existing user matched by email/phone.
     // Never include the linked account's contact details in a guest PDF.
-    const safeDonor = session?.user?.id ? donationRow.donor : {
+    const canViewIdentity = Boolean(session?.user?.id &&
+      (session.user.id === authorizationRow.donorId ||
+       userHasDashboardPermission(session.user, 'revenue')));
+    const safeDonor = canViewIdentity ? donationRow.donor : {
       ...donationRow.donor,
       name: 'Donor',
       email: null,
