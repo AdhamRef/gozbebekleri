@@ -39,16 +39,17 @@ test("Clarity client route guard does not initialize on admin, account or consen
     compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}
   }).outputText;
   const Clarity={initCalls:[],init(id){this.initCalls.push(id)}};
-  const state={pathname:"/dashboard/platform-connections/tracking",consent:"granted",requests:0,stops:0};
+  const state={pathname:"/dashboard/platform-connections/tracking",consent:"granted",requests:0,stops:0,starts:0};
   const browser={
     __clarityInitialized:false,location:{pathname:"/ar"},
+    addEventListener:()=>{},removeEventListener:()=>{},
     localStorage:{getItem:()=>state.consent},
-    clarity:(event)=>{if(event==="stop")state.stops++},
+    clarity:(event)=>{if(event==="stop")state.stops++;if(event==="start")state.starts++},
   };
   const doc={scripts:[]};
   const component={exports:{}};
   const mocks={
-    react:{useEffect:(fn)=>fn()},
+    react:{useEffect:(fn)=>fn(),useState:(initial)=>[initial,()=>{}]},
     "next/navigation":{usePathname:()=>state.pathname},
     "@microsoft/clarity":{__esModule:true,default:Clarity},
     "@/lib/tracking/provider-runtime-policy":{validateClarityProjectId},
@@ -73,6 +74,17 @@ test("Clarity client route guard does not initialize on admin, account or consen
   assert.equal(state.requests,1);assert.equal(Clarity.initCalls.length,1);
   state.pathname="/ar/account";render();await settle();
   assert.equal(state.stops,1);
+  assert.equal(state.requests,1);
+  state.pathname="/ar/campaigns";render();await settle();
+  assert.equal(state.starts,1);
+  assert.equal(state.requests,1);
+  state.consent="denied";render();await settle();
+  assert.equal(state.stops,2);
+  state.pathname="/ar/checkout";render();await settle();
+  assert.equal(state.starts,1);
+  state.pathname="/ar";state.consent="granted";render();await settle();
+  assert.equal(state.starts,2);
+  assert.equal(Clarity.initCalls.length,1);
 });
 
 test("Clarity and GTM reject injected script and accept normalized IDs",()=>{
