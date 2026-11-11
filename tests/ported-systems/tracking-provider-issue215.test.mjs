@@ -9,6 +9,26 @@ const {
 } = providerModule.default ?? providerModule;
 const { loadConfiguredGoogleTagManager, initializeGoogleTracking } = loaderModule.default ?? loaderModule;
 
+const privacyModule = await import("../../lib/tracking/clarity-privacy-policy.ts");
+const { isSensitiveClarityPath, mayInitializeClarity } = privacyModule.default ?? privacyModule;
+
+test("Clarity fails closed without explicit consent, honors opt-out and excludes sensitive routes",()=>{
+  const publicPages=["/ar","/en/campaigns","/tr/about-us","/ar/campaign/fixture"];
+  const forbidden=["/dashboard/platform-connections/tracking","/ar/account",
+    "/ar/checkout","/ar/success/fixture","/en/donation-failed","/ar/receipt/fixture",
+    "/ar/certificate","/auth/signin","/api/tracking/config","/en/profile","/tr/subscriptions"];
+  for(const path of publicPages){
+    assert.equal(isSensitiveClarityPath(path),false,path);
+    assert.equal(mayInitializeClarity(path,null),false,path);
+    assert.equal(mayInitializeClarity(path,"denied"),false,path);
+    assert.equal(mayInitializeClarity(path,"granted"),true,path);
+  }
+  for(const path of forbidden){
+    assert.equal(isSensitiveClarityPath(path),true,path);
+    assert.equal(mayInitializeClarity(path,"granted"),false,path);
+  }
+});
+
 test("Clarity and GTM reject injected script and accept normalized IDs",()=>{
   for(const value of ["<script>evil()</script>","https://clarity.ms/","id onload=alert(1)","",null,42]){
     assert.equal(validateClarityProjectId(value),null);
