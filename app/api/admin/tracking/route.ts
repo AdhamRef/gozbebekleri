@@ -8,12 +8,15 @@ import { getRawTrackingSettings, TRACKING_SETTINGS_COLLECTION } from "@/lib/trac
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { encryptIntegrationSecret, integrationEncryptionKeyIsConfigured } from "@/lib/integration-settings/crypto";
 import { googleTagManagerId } from "@/lib/tracking/google-script-policy";
+import { runtimeProviderSettings, validateClarityProjectId } from "@/lib/tracking/provider-runtime-policy";
 import { parseGa4ServiceAccountJson } from "@/lib/marketing/ga4-reporting";
 
 
 const PLAIN_FIELDS = [
   "googleTagManagerId",
   "googleTagManagerEnabled",
+  "clarityProjectId",
+  "clarityEnabled",
   "facebookPixelId",
   "facebookTestEventCode",
   "metaDatasetId",
@@ -122,6 +125,16 @@ function serializeSettings(raw: TrackingRaw | null) {
   output.gaServiceAccountJsonPresent = typeof raw?.gaServiceAccountEncrypted === "string"
     && raw.gaServiceAccountEncrypted.trim().length > 0;
 
+  const effective = runtimeProviderSettings(raw);
+  output.googleTagManagerId = effective.googleTagManagerId;
+  output.googleTagManagerEnabled = effective.googleTagManagerEnabled;
+  output.clarityProjectId = effective.clarityProjectId;
+  output.clarityEnabled = effective.clarityEnabled;
+  output.clarityConfigurationStatus = !effective.clarityEnabled ? "disabled" : "configured";
+  output.gtmConfigurationStatus = !effective.googleTagManagerEnabled ? "disabled" : "configured";
+  // Setting persistence and an ID are NOT proof that a provider received data.
+  output.clarityVerificationStatus = "not_verified";
+  output.gtmVerificationStatus = "not_verified";
   output.createdAt = normalizeDate(raw?.createdAt);
   output.updatedAt = normalizeDate(raw?.updatedAt);
   output.updatedBy = typeof raw?.updatedBy === "string" ? raw.updatedBy : null;
@@ -238,6 +251,22 @@ export async function PUT(request: NextRequest) {
     }
 
     const existing = await getRawTrackingSettings();
+    if (Object.hasOwn(bodyRaw, "clarityEnabled") && typeof bodyRaw.clarityEnabled !== "boolean") {
+      return NextResponse.json({ error: "INVALID_CLARITY_ENABLED" }, { status: 400 });
+    }
+    if (Object.hasOwn(bodyRaw, "clarityProjectId")) {
+      const id = bodyRaw.clarityProjectId;
+      if (id !== null && id !== "" && !validateClarityProjectId(id)) {
+        return NextResponse.json({ error: "INVALID_CLARITY_PROJECT_ID" }, { status: 400 });
+      }
+      bodyRaw.clarityProjectId = validateClarityProjectId(id);
+    }
+    const effectiveClarity = runtimeProviderSettings(existing);
+    if ((bodyRaw.clarityEnabled ?? effectiveClarity.clarityEnabled) === true &&
+        !validateClarityProjectId(
+          Object.hasOwn(bodyRaw, "clarityProjectId") ? bodyRaw.clarityProjectId : effectiveClarity.clarityProjectId)) {
+      return NextResponse.json({ error: "CLARITY_PROJECT_ID_REQUIRED" }, { status: 400 });
+    }
     if (Object.hasOwn(bodyRaw, "googleTagManagerEnabled") && typeof bodyRaw.googleTagManagerEnabled !== "boolean") {
       return NextResponse.json({ error: "INVALID_GTM_SETTING" }, { status: 400 });
     }
@@ -248,12 +277,30 @@ export async function PUT(request: NextRequest) {
       }
       bodyRaw.googleTagManagerId = googleTagManagerId(value);
     }
-    const nextGtmEnabled = bodyRaw.googleTagManagerEnabled ?? existing?.googleTagManagerEnabled;
-    const nextGtmId = Object.hasOwn(bodyRaw, "googleTagManagerId") ? bodyRaw.googleTagManagerId : existing?.googleTagManagerId;
+    // Legacy container remains effective until explicitly edited or disabled;
+    // a settings update to another provider must not silently turn GTM off.
+    const effectiveGtm = runtimeProviderSettings(existing);
+    const nextGtmEnabled = bodyRaw.googleTagManagerEnabled ?? effectiveGtm.googleTagManagerEnabled;
+    const nextGtmId = Object.hasOwn(bodyRaw, "googleTagManagerId") ? bodyRaw.googleTagManagerId : effectiveGtm.googleTagManagerId;
     if (nextGtmEnabled === true && !googleTagManagerId(nextGtmId)) {
       return NextResponse.json({ error: "GTM_CONTAINER_ID_REQUIRED" }, { status: 400 });
     }
     const actor = auditActorFromDashboardSession(session!);
+    // Single document migration: preserve live legacy IDs even when the
+    // first edited field is unrelated, unless the operator explicitly
+    // supplies new IDs/enabled states.
+    if (!existing || !Object.hasOwn(existing, "clarityProjectId")) {
+      bodyRaw.clarityProjectId ??= effectiveClarity.clarityProjectId;
+    }
+    if (!existing || !Object.hasOwn(existing, "clarityEnabled")) {
+      bodyRaw.clarityEnabled ??= effectiveClarity.clarityEnabled;
+    }
+    if (!existing || !Object.hasOwn(existing, "googleTagManagerId")) {
+      bodyRaw.googleTagManagerId ??= effectiveGtm.googleTagManagerId;
+    }
+    if (!existing || !Object.hasOwn(existing, "googleTagManagerEnabled")) {
+      bodyRaw.googleTagManagerEnabled ??= effectiveGtm.googleTagManagerEnabled;
+    }
     const update = buildUpdateFromBody(
       {
         ...bodyRaw,
