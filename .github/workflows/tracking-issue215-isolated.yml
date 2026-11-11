@@ -1,0 +1,41 @@
+name: Tracking Issue 215 isolated API and loader
+on:
+  push:
+    branches: [feature/goz-tracking-clarity-gtm-issue-215-20261111]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tracking-issue215-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tracking:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mongodb://127.0.0.1:27018/tracking_qa_fixture
+      NEXTAUTH_SECRET: fixture-not-a-real-secret
+      STRIPE_SECRET_KEY: sk_test_offline_fixture_no_network
+    steps:
+      - name: Read exact repository archive (inherited main has malformed legacy gitlink)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'header = "Authorization: Bearer %s"\n' "$GH_TOKEN" |
+            curl --fail --silent --show-error --location --config - \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" --output source.tgz
+          tar -xzf source.tgz --strip-components=1
+          rm source.tgz
+      - name: Setup Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install locked dependencies without scripts
+        run: npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - name: Unit-test Clarity/GTM ID/loader dedup
+        run: node --import tsx --test tests/ported-systems/tracking-provider-issue215.test.mjs
+      - name: HTTP-test admin permission, Mongo fixture persistence and public runtime config
+        run: node --conditions=react-server --import tsx scripts/qa-tracking-provider-http-isolated.mjs
