@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
+const providerModule = await import("../../lib/tracking/provider-runtime-policy.ts");
+const loaderModule = await import("../../lib/tracking/google-script-policy.ts");
+const {
   LEGACY_CLARITY_PROJECT_ID, LEGACY_GTM_CONTAINER_ID,
   validateClarityProjectId, validateGtmContainerId,
   runtimeProviderSettings, providerConfigurationStatus,
-} from "../../lib/tracking/provider-runtime-policy.ts";
-import { loadConfiguredGoogleTagManager, initializeGoogleTracking } from "../../lib/tracking/google-script-policy.ts";
+} = providerModule.default ?? providerModule;
+const { loadConfiguredGoogleTagManager, initializeGoogleTracking } = loaderModule.default ?? loaderModule;
 
 test("Clarity and GTM reject injected script and accept normalized IDs",()=>{
   for(const value of ["<script>evil()</script>","https://clarity.ms/","id onload=alert(1)","",null,42]){
