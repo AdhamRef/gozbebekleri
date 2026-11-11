@@ -54,6 +54,26 @@ jobs:
         id: typescript
         continue-on-error: true
         run: npx tsc --noEmit --pretty false
+      - name: Start ephemeral localhost MongoDB replica set for build-only sitemap
+        run: |
+          set -euo pipefail
+          docker run -d --name qa-mongo --publish 127.0.0.1:27018:27017 \
+            mongo:7.0 --replSet qa-rs --bind_ip_all
+          for attempt in $(seq 1 45); do
+            if docker exec qa-mongo mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' 2>/dev/null | grep -qx 1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec qa-mongo mongosh --quiet --eval 'rs.initiate({_id:"qa-rs",members:[{_id:0,host:"127.0.0.1:27017"}]})'
+          for attempt in $(seq 1 45); do
+            if docker exec qa-mongo mongosh --quiet --eval 'rs.status().ok' 2>/dev/null | grep -qx 1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec qa-mongo mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' | grep -qx 1
+          echo "Ephemeral MongoDB container ready; no external database used."
       - name: Isolated Next.js build without production database index task
         id: build
         continue-on-error: true
