@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { isSensitiveClarityPath, mayInitializeClarity } from "@/lib/tracking/clarity-privacy-policy";
 import Clarity from "@microsoft/clarity";
+import { mayInitializeClarity } from "@/lib/tracking/clarity-privacy-policy";
 import { validateClarityProjectId } from "@/lib/tracking/provider-runtime-policy";
 
 declare global {
@@ -11,78 +11,111 @@ declare global {
     __clarityInitialized?: boolean;
     __clarityProjectId?: string;
     __clarityStopped?: boolean;
+    clarity?: (...args: unknown[]) => void;
   }
 }
 
-/** Fetch the public, redacted runtime settings on every fresh page load.
- * The dashboard must not record its own administrators. Do not call init if
- * any Clarity script already exists (including a legacy GTM-injected tag).
- */
+function consentValue(): string | null {
+  try { return window.localStorage.getItem("goz_analytics_consent"); }
+  catch { return null; }
+}
+function publicAndConsented(): boolean {
+  return mayInitializeClarity(window.location.pathname, consentValue(), window.location.search);
+}
+function hasForeignClarityScript(): boolean {
+  return Array.from(document.scripts).some(script => {
+    try {
+      const url = new URL(script.src);
+      return url.hostname === "www.clarity.ms" || url.hostname === "clarity.ms";
+    } catch { return false; }
+  });
+}
+
+/** The history events are necessary for same-path query changes via pushState. */
+function listenForHistoryChanges(refresh: () => void): () => void {
+  const originalPush = window.history.pushState;
+  const originalReplace = window.history.replaceState;
+  window.history.pushState = function (...args) {
+    const result = originalPush.apply(this, args);
+    refresh();
+    return result;
+  };
+  window.history.replaceState = function (...args) {
+    const result = originalReplace.apply(this, args);
+    refresh();
+    return result;
+  };
+  return () => {
+    window.history.pushState = originalPush;
+    window.history.replaceState = originalReplace;
+  };
+}
+
 export default function MicrosoftClarity() {
   const pathname = usePathname();
-  const [consentRevision, setConsentRevision] = useState(0);
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
-    const refresh = () => setConsentRevision(value => value + 1);
-    window.addEventListener("storage", refresh);
-    window.addEventListener("focus", refresh);
-    window.addEventListener("popstate", refresh);
-    window.addEventListener("hashchange", refresh);
-    window.addEventListener("goz:analytics-consent-change", refresh);
+    const refresh = () => setRevision(value => value + 1);
+    const disposeHistory = listenForHistoryChanges(refresh);
+    for (const name of ["storage", "focus", "popstate", "hashchange", "goz:analytics-consent-change"]) {
+      window.addEventListener(name, refresh);
+    }
     return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("popstate", refresh);
-      window.removeEventListener("hashchange", refresh);
-      window.removeEventListener("goz:analytics-consent-change", refresh);
+      disposeHistory();
+      for (const name of ["storage", "focus", "popstate", "hashchange", "goz:analytics-consent-change"]) {
+        window.removeEventListener(name, refresh);
+      }
     };
   }, []);
+
   useEffect(() => {
-    // Conservative privacy gate: no Clarity init/start on sensitive pages
-    // or without an explicit consent signal from the approved CMP.
-    let consent: string | null = null;
-    try { consent = window.localStorage.getItem("goz_analytics_consent"); } catch {}
-    if (!mayInitializeClarity(pathname, consent, window.location.search)) {
+    const controller = new AbortController();
+    if (!publicAndConsented()) {
       if (window.__clarityInitialized && !window.__clarityStopped) {
-        try {
-          (window as Window & { clarity?: (...args: unknown[]) => void }).clarity?.("stop");
-        } catch {}
+        try { window.clarity?.("stop"); } catch { /* fail closed for subsequent starts */ }
         window.__clarityStopped = true;
       }
       return;
     }
-    if (window.__clarityInitialized) {
-      if (window.__clarityStopped) {
-        // Restart ONLY on a consented public page. Provider network validation
-        // is still required to prove stopping actually ceased uploads.
-        try {
-          (window as Window & { clarity?: (...args: unknown[]) => void }).clarity?.("start");
-          window.__clarityStopped = false;
-        } catch {}
-      }
-      return;
-    }
-    const controller = new AbortController();
+    // Recheck server-side enablement on every eligibility transition. Never
+    // resume a recorder based on stale settings from a previous route.
     void fetch("/api/tracking/config", {
       cache: "no-store", credentials: "same-origin", signal: controller.signal,
     }).then(async response => {
       if (!response.ok) return;
       const settings = await response.json();
       const id = validateClarityProjectId(settings?.clarityProjectId);
-      if (!settings?.clarityEnabled || !id ||
-          controller.signal.aborted || window.__clarityInitialized) return;
-      if (Array.from(document.scripts).some(script =>
-        /(^|\.)clarity\.ms$/.test((() => { try { return new URL(script.src).hostname; } catch { return ""; } })()))) {
-        window.__clarityInitialized = true;
+      if (controller.signal.aborted || !publicAndConsented() ||
+          !settings?.clarityEnabled || !id) {
+        if (window.__clarityInitialized && !window.__clarityStopped) {
+          try { window.clarity?.("stop"); } catch {}
+          window.__clarityStopped = true;
+        }
         return;
       }
+      if (window.__clarityInitialized) {
+        // A changed project ID must never silently reinitialize a live recorder.
+        if (window.__clarityProjectId !== id) return;
+        if (window.__clarityStopped && publicAndConsented()) {
+          try {
+            if (typeof window.clarity !== "function") return;
+            window.clarity("start");
+            window.__clarityStopped = false;
+          } catch { /* do not mark a failed start successful */ }
+        }
+        return;
+      }
+      if (hasForeignClarityScript()) {
+        // Do not claim ownership of an externally injected recorder.
+        return;
+      }
+      if (!publicAndConsented() || controller.signal.aborted) return;
       Clarity.init(id);
       window.__clarityInitialized = true;
       window.__clarityStopped = false;
       window.__clarityProjectId = id;
-    }).catch(() => {
-      // Tracking must not break navigation or expose provider details.
-    });
+    }).catch(() => { /* fail closed: tracking never breaks the application */ });
     return () => controller.abort();
-  }, [pathname, consentRevision]);
+  }, [pathname, revision]);
   return null;
 }
