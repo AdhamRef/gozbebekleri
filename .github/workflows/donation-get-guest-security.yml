@@ -38,3 +38,5 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/qa-guest-receipt-capability.mjs
       - name: OAuth guest claim access regression
         run: node --conditions=react-server --import tsx scripts/qa-guest-oauth-link-http.mjs
+      - name: Guest claim scope and unrelated donor isolation
+        run: node --conditions=react-server --import tsx scripts/qa-guest-claim-scope.mjs
