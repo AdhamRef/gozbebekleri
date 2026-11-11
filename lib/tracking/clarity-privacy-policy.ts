@@ -17,6 +17,9 @@ export function isSensitiveClarityQuery(search: string): boolean {
   if (!search) return false;
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   for (const [name, value] of params) {
+    // Unknown query fields can contain donor identifiers even when their key
+    // is not obviously named "token". Fail closed; allow only standard UTM.
+    if (!/^utm_(source|medium|campaign|content|term)$/i.test(name)) return true;
     const normalizedName = name.replace(/([a-z])([A-Z])/g, "$1_$2");
     if (/(?:^|[_-])(email|phone|mobile|token|secret|password|session|auth|receipt|donation|payment|customer|client)(?:$|[_-])/i.test(normalizedName)) return true;
     if (/@|(?:^|[^a-z])(?:pi_|cs_|sk_|pk_)/i.test(value)) return true;
