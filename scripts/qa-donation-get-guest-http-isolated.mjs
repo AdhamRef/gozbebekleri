@@ -109,7 +109,7 @@ try{
  assert.equal((await call("GET")).status,404);
  pass("HTTP GET refuses anonymous or unrelated authenticated caller without guest grant");
 
- x=await call("GET",undefined,cookie);
+ let x=await call("GET",undefined,cookie);
  assert.equal(x.status,200,JSON.stringify(x.payload));
  assert.deepEqual(Object.keys(x.payload).sort(),[
  "id","amount","totalAmount","currency","status","paidAt","createdAt","paymentMethod",
