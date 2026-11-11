@@ -74,7 +74,22 @@ try{
  assert.equal((await put({})).status,401);passed++;
  globalThis.fixture.session={user:{id:owner,role:"DONOR"}};
  assert.equal((await put({})).status,200);passed++;
+ globalThis.fixture.session={user:{id:stranger,role:"STAFF",dashboardPermissions:[]}};
+ for(const body of [{},{status:"ACTIVE"}]){
+  const result=await put(body);
+  assert.equal(result.status,403,result.text);
+  assert.doesNotMatch(result.text,/nextBillingDate|totalAmount|dddddddddddd|donor|subscription/);
+  assert.equal(writes,0);passed++;
+ }
+ globalThis.fixture.session={user:{id:stranger,role:"DONOR",dashboardPermissions:[]}};
+ assert.equal((await put({status:"CANCELLED"})).status,403);
+ assert.equal(writes,0);passed++;
+ globalThis.fixture.session={user:{id:owner,role:"DONOR"}};
+ assert.equal((await put({status:"CANCELLED"})).status,403);
+ assert.equal(writes,0);passed++;
  globalThis.fixture.session={user:{id:stranger,role:"STAFF",dashboardPermissions:["revenue"]}};
+ assert.equal((await put({})).status,200);passed++;
+ globalThis.fixture.session={user:{id:stranger,role:"ADMIN"}};
  assert.equal((await put({})).status,200);passed++;
  console.log(JSON.stringify({summary:"DONATION_PUT_HOTFIX_HTTP_PASS",passed,writes}));
 }finally{
