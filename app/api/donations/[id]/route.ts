@@ -218,7 +218,10 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const { status } = body;
 
     const currentDonation = await prisma.donation.findUnique({
@@ -354,7 +357,7 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating donation:', error);
     return NextResponse.json(
-      { error: 'Failed to update donation', details: (error as Error).message },
+      { error: 'Failed to update donation' },
       { status: 500 }
     );
   }
