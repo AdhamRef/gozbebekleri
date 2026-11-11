@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {createServer} from "node:http";
 import {registerHooks} from "node:module";
 import {mkdtempSync,writeFileSync,rmSync} from "node:fs";
+import {tmpdir} from "node:os";
 import {resolve} from "node:path";
 import {pathToFileURL} from "node:url";
 const root=mkdtempSync(resolve(tmpdir(),"goz-message-hotfix-"));
