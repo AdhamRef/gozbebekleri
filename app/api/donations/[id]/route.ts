@@ -241,12 +241,16 @@ export async function PUT(
       );
     }
 
-    const isAdmin = isRevenueDashboardUser(session);
+    // Revenue-only access is READ access. Subscription mutation needs the
+    // explicit donationsEdit permission, or ownership with limited actions.
+    const isAdmin = session.user.role === 'ADMIN';
+    const canReadFinancial = isRevenueDashboardUser(session);
+    const canEditFinancial = userHasDashboardPermission(session.user, 'donationsEdit');
     const isOwner = session.user.id === currentDonation.donorId;
 
     // Check server-side authorization before empty-update read responses,
     // subscription details, or any mutable operation.
-    if (!isAdmin && !isOwner) {
+    if (!canReadFinancial && !canEditFinancial && !isOwner) {
       return NextResponse.json({ error: 'Forbidden' }, {
         status: 403, headers: { 'Cache-Control': 'no-store' },
       });
@@ -278,6 +282,23 @@ export async function PUT(
       updates.status = status as SubscriptionStatus;
     }
 
+    if (Object.keys(updates).length > 0) {
+      // A STAFF member granted 'revenue' can read the monthly record but
+      // must not change it unless separately granted 'donationsEdit'.
+      if (!isOwner && !canEditFinancial) {
+        return NextResponse.json({ error: 'Forbidden' }, {
+          status: 403, headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+      // Cancellation always requires ADMIN; donor and STAFF edit permission
+      // alone must not upgrade to the destructive cancellation privilege.
+      if (status === 'CANCELLED' && !isAdmin) {
+        return NextResponse.json({ error: 'Forbidden' }, {
+          status: 403, headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+    }
+
     if (Object.keys(updates).length === 0) {
       const out = await prisma.donation.findUnique({
         where: { id },
@@ -298,13 +319,6 @@ export async function PUT(
         nextBillingDate: s?.nextBillingDate ?? null,
         lastBillingDate: s?.lastBillingDate ?? null,
       });
-    }
-
-    if (!isAdmin && isOwner && status === 'CANCELLED') {
-      return NextResponse.json(
-        { error: 'Only admin can cancel a subscription' },
-        { status: 403 }
-      );
     }
 
     await prisma.subscription.update({
