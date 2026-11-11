@@ -36,3 +36,5 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/qa-donation-get-guest-http-isolated.mjs
       - name: Cryptographic guest grant checks
         run: node --conditions=react-server --import tsx scripts/qa-guest-receipt-capability.mjs
+      - name: OAuth guest claim access regression
+        run: node --conditions=react-server --import tsx scripts/qa-guest-oauth-link-http.mjs
