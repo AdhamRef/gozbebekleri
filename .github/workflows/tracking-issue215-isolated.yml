@@ -35,6 +35,12 @@ jobs:
           cache: npm
       - name: Install locked dependencies without scripts
         run: npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - name: Generate synthetic Prisma clients for focused TypeScript validation
+        run: |
+          npx --no-install prisma generate --schema prisma/schema.prisma
+          npx --no-install prisma generate --schema prisma/integration-settings.schema.prisma
+      - name: Typecheck tracking runtime and admin editor
+        run: npx --no-install tsc -p tsconfig.tracking-issue215.json --noEmit
       - name: Unit-test Clarity/GTM ID/loader dedup
         run: node --import tsx --test tests/ported-systems/tracking-provider-issue215.test.mjs
       - name: HTTP-test admin permission, Mongo fixture persistence and public runtime config
