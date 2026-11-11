@@ -86,6 +86,20 @@ test("Clarity and GTM reject injected script and accept normalized IDs",()=>{
   assert.equal(validateGtmContainerId("gtm-mmnbqqwb"),"GTM-MMNBQQWB");
 });
 
+test("saved Clarity settings take precedence over old NEXT_PUBLIC_CLARITY_ID",()=>{
+  const old = process.env.NEXT_PUBLIC_CLARITY_ID;
+  try {
+    process.env.NEXT_PUBLIC_CLARITY_ID="env123456";
+    assert.equal(runtimeProviderSettings(null).clarityProjectId,"env123456");
+    assert.equal(runtimeProviderSettings({clarityEnabled:true,clarityProjectId:"db123456"}).clarityProjectId,"db123456");
+    assert.equal(runtimeProviderSettings({clarityEnabled:false,clarityProjectId:"db123456"}).clarityEnabled,false);
+    assert.equal(runtimeProviderSettings({clarityEnabled:true,clarityProjectId:null}).clarityEnabled,false);
+  } finally {
+    if (old===undefined) delete process.env.NEXT_PUBLIC_CLARITY_ID;
+    else process.env.NEXT_PUBLIC_CLARITY_ID=old;
+  }
+});
+
 test("known legacy scripts are preserved until operator explicitly disables them",()=>{
   const legacy=runtimeProviderSettings(null);
   assert.equal(legacy.clarityProjectId,LEGACY_CLARITY_PROJECT_ID);
