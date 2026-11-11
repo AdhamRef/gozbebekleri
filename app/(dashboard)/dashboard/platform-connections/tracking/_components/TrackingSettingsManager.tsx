@@ -16,6 +16,12 @@ type SecretKey = "facebookAccessToken" | "gaApiSecret" | "tiktokAccessToken" | "
 type Settings = {
   googleTagManagerId: string | null;
   googleTagManagerEnabled: boolean;
+  clarityProjectId: string | null;
+  clarityEnabled: boolean;
+  clarityConfigurationStatus?: string;
+  clarityVerificationStatus?: string;
+  gtmConfigurationStatus?: string;
+  gtmVerificationStatus?: string;
   id: string | null;
   facebookPixelId: string | null;
   facebookTestEventCode: string | null;
@@ -67,6 +73,8 @@ type Diagnostics = Partial<Record<Platform, DiagnosticItem>>;
 const defaults: Settings = {
   googleTagManagerId: null,
   googleTagManagerEnabled: false,
+  clarityProjectId: null,
+  clarityEnabled: false,
   id: null,
   facebookPixelId: null,
   facebookTestEventCode: null,
@@ -218,7 +226,7 @@ export default function TrackingSettingsManager({ canManage, canTest }: { canMan
       toast.success(dt("تم حفظ إعدادات التتبع بنجاح"));
     } catch (error) {
       const code = axios.isAxiosError(error) ? error.response?.data?.error : null;
-      toast.error(["INVALID_GTM_CONTAINER_ID", "GTM_CONTAINER_ID_REQUIRED", "INVALID_GTM_SETTING"].includes(code)
+      toast.error(["INVALID_GTM_CONTAINER_ID", "GTM_CONTAINER_ID_REQUIRED", "INVALID_GTM_SETTING", "INVALID_CLARITY_ENABLED", "INVALID_CLARITY_PROJECT_ID", "CLARITY_PROJECT_ID_REQUIRED"].includes(code)
         ? dt("أدخل معرّف حاوية صحيحًا بصيغة GTM-XXXX قبل تفعيلها.")
         : dt("فشل حفظ الإعدادات"));
     }
@@ -314,7 +322,33 @@ export default function TrackingSettingsManager({ canManage, canTest }: { canMan
     <div className="grid gap-3 md:grid-cols-5"><Status label="Meta" status={status.meta} /><Status label="GA4" status={status.ga4} /><Status label="Google Ads" status={status.google_ads} /><Status label="TikTok" status={status.tiktok} /><Status label="X" status={status.x} /></div>
 
     <PlatformCard canTest={canTest} blocked={unsaved || saving || !savedSettings || testing !== null} title={dt("فيسبوك / Meta")} desc="Pixel + Conversion API" platform="meta" testing={testing} test={test}><Field disabled={!canManage || saving} label="Pixel ID" value={txt(settings.facebookPixelId)} onChange={(v) => set("facebookPixelId", v || null)} /><Field disabled={!canManage || saving} label={dt("Dataset ID اختياري")} value={txt(settings.metaDatasetId)} onChange={(v) => set("metaDatasetId", v || null)} />{secretField("facebookAccessToken", "Conversion API Access Token")}<Field disabled={!canManage || saving} label="Test Event Code" value={txt(settings.facebookTestEventCode)} onChange={(v) => set("facebookTestEventCode", v || null)} /><Field disabled={!canManage || saving} label="Donate Event Name" value={txt(settings.metaDonateEventName)} onChange={(v) => set("metaDonateEventName", v || "Donate")} /><TestBox platform="meta" /></PlatformCard>
-    <Card><CardHeader><CardTitle>{dt("Google Tag Manager (اختياري)")}</CardTitle><CardDescription>{dt("تعمل وسوم GA4 وحسابات Google Ads المحفوظة مباشرة. فعّل حاوية مخصصة فقط عند الحاجة، وتجنب إضافة الوسوم نفسها داخلها حتى لا تتكرر الأحداث ويتباطأ الموقع.")}</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><Field disabled={!canManage || saving} label={dt("معرّف حاوية GTM")} value={txt(settings.googleTagManagerId)} onChange={(v) => set("googleTagManagerId", v.trim() || null)} /><Toggle disabled={!canManage || saving} label={dt("تفعيل حاوية Google Tag Manager")} checked={settings.googleTagManagerEnabled} onChange={(v) => set("googleTagManagerEnabled", v)} /></CardContent></Card>
+    <Card role="region" aria-label="Microsoft Clarity">
+      <CardHeader>
+        <CardTitle>Microsoft Clarity</CardTitle>
+        <CardDescription>{dt("تسجيل جلسات الموقع العام من إعدادات محفوظة؛ لا يتم تسجيل جلسات لوحة التحكم. حفظ المعرّف ليس إثباتًا لنجاح الاتصال.")}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4 sm:grid-cols-2">
+        <Field label="Clarity Project ID" value={txt(settings.clarityProjectId)}
+          disabled={!canManage || saving} placeholder="u614k028k2"
+          onChange={value => set("clarityProjectId", value.trim() || null)} />
+        <Toggle label={dt("تفعيل تسجيل Microsoft Clarity")} checked={settings.clarityEnabled}
+          disabled={!canManage || saving} onChange={value => set("clarityEnabled", value)} />
+        <div className="space-y-2 rounded-lg border border-slate-200 p-3 text-xs sm:col-span-2">
+          <p>{dt("حالة الإعداد")}: <strong>{savedSettings?.clarityEnabled && savedSettings.clarityProjectId ? dt("مهيأ ومفعّل") : dt("غير مفعّل")}</strong></p>
+          <p>{dt("التحقق الخارجي")}: <strong>{dt("لم يتم التحقق بعد — يلزم فحص شبكة المتصفح في Staging معتمدة")}</strong></p>
+          <p>{dt("رصد السكربت")}: {dt("يُفحص عند فتح الموقع العام، وليس من لوحة الإدارة")}</p>
+          {savedSettings?.clarityProjectId ? <a className="inline-flex font-semibold text-brand underline" target="_blank" rel="noopener noreferrer"
+            href={`https://clarity.microsoft.com/projects/view/${encodeURIComponent(savedSettings.clarityProjectId)}/dashboard`}>{dt("فتح تسجيلات Clarity")}</a> : null}
+        </div>
+      </CardContent>
+    </Card>
+    <Card><CardHeader><CardTitle>{dt("Google Tag Manager (اختياري)")}</CardTitle><CardDescription>{dt("تعمل وسوم GA4 وحسابات Google Ads المحفوظة مباشرة. فعّل حاوية مخصصة فقط عند الحاجة، وتجنب إضافة الوسوم نفسها داخلها حتى لا تتكرر الأحداث ويتباطأ الموقع.")}</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><Field disabled={!canManage || saving} label={dt("معرّف حاوية GTM")} value={txt(settings.googleTagManagerId)} onChange={(v) => set("googleTagManagerId", v.trim() || null)} /><Toggle disabled={!canManage || saving} label={dt("تفعيل حاوية Google Tag Manager")} checked={settings.googleTagManagerEnabled} onChange={(v) => set("googleTagManagerEnabled", v)} /><div className="rounded-lg border p-3 text-xs text-slate-600 md:col-span-2">
+      <p>{dt("حالة الإعداد")}: {savedSettings?.googleTagManagerEnabled && savedSettings.googleTagManagerId ? dt("مهيأ ومفعّل") : dt("غير مفعّل")}</p>
+      <p>{dt("التحقق الخارجي")}: {dt("غير متحقق — فحص GTM Preview والشبكة مطلوب")}</p>
+      <p className="mt-2 text-amber-700">{dt("تأكد من عدم وجود GA4 أو Google Ads أو Clarity مكررة داخل حاوية GTM. حدث Purchase يصدر من مسار نجاح الدفع المؤكد فقط.")}</p>
+      {savedSettings?.googleTagManagerId ? <a target="_blank" rel="noopener noreferrer" className="font-semibold text-brand underline"
+        href={`https://tagmanager.google.com/#/container/accounts/`}>{dt("فتح Google Tag Manager")}</a> : null}
+    </div></CardContent></Card>
     <PlatformCard canTest={canTest} blocked={unsaved || saving || !savedSettings || testing !== null} title="Google Analytics 4" desc="Measurement Protocol + Data API reports" platform="ga4" testing={testing} test={test}><Field disabled={!canManage || saving} label="Measurement ID" value={txt(settings.gaMeasurementId)} onChange={(v) => set("gaMeasurementId", v || null)} />{secretField("gaApiSecret", "Measurement Protocol API Secret")}<Field disabled={!canManage || saving} label={dt("Property ID (يُستخدم للتقارير أيضًا)")} value={txt(settings.gaPropertyId)} onChange={(v) => set("gaPropertyId", v || null)} /><Field disabled={!canManage || saving} label={dt("Stream ID اختياري")} value={txt(settings.gaStreamId)} onChange={(v) => set("gaStreamId", v || null)} /><Toggle disabled={!canManage || saving} label="Debug Mode" checked={settings.gaDebugMode} onChange={(v) => set("gaDebugMode", v)} />
       <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50/50 p-3 md:col-span-2">
         <div><p className="text-sm font-semibold text-slate-800">{dt("صلاحية قراءة تقارير GA4")}</p><p className="mt-1 text-xs leading-5 text-slate-600">{dt("تستخدم التقارير Property ID الموجود أعلاه. أضف حساب خدمة بصلاحية Viewer؛ هذا المفتاح للقراءة فقط ومنفصل عن API Secret المستخدم لإرسال الأحداث.")}</p></div>

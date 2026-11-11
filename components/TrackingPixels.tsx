@@ -291,6 +291,11 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
 
     const load = () => {
       if (fired) return;
+      // Idle/interaction is not consent. Do not load any marketing tag until
+      // the visitor has explicitly opted in through the privacy control.
+      try {
+        if (window.localStorage.getItem("goz_analytics_consent") !== "granted") return;
+      } catch { return; }
       fired = true;
 
       fetch("/api/tracking/config")
@@ -314,14 +319,18 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
     // Fire-now path for conversion pages. The match is locale-agnostic  any
     // pathname segment "/success/<id>" qualifies.
     const isConversionPage = /\/(success|donation-failed)(\/|$)/.test(window.location.pathname);
+    window.addEventListener("goz:analytics-consent-change", load);
     if (isConversionPage) {
       load();
-      return;
+      return () => window.removeEventListener("goz:analytics-consent-change", load);
     }
 
-    // Everything else waits for the shared marketing gate: the first real
-    // interaction, or shortly after `load` (lib/tracking/marketing-gate.ts).
-    return whenMarketingAllowed(load);
+    // A consent transition may open the gate after the idle callback has run.
+    const cancelIdleGate = whenMarketingAllowed(load);
+    return () => {
+      cancelIdleGate();
+      window.removeEventListener("goz:analytics-consent-change", load);
+    };
   }, []);
 
   // ── Inject pixel scripts once config is ready ────────────────────────────────

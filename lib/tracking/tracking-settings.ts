@@ -1,5 +1,5 @@
 import { googleAdsTargets, type GoogleAdsTarget } from "./google-ads-targets";
-import { configuredGoogleTagManager } from "./google-script-policy";
+import { runtimeProviderSettings } from "./provider-runtime-policy";
 import { prisma } from "@/lib/prisma";
 
 export const TRACKING_SETTINGS_COLLECTION = "TrackingSettings";
@@ -9,6 +9,10 @@ export type RawTrackingSettings = Record<string, unknown>;
 export type PublicTrackingConfig = {
   googleTagManagerId: string | null;
   googleTagManagerEnabled: boolean;
+  clarityProjectId: string | null;
+  clarityEnabled: boolean;
+  clarityConfigurationStatus: "configured" | "disabled" | "unconfigured";
+  clarityVerificationStatus: "not_verified";
   googleAdsTargets?: GoogleAdsTarget[];
   facebookPixelId: string | null;
   gaMeasurementId: string | null;
@@ -67,10 +71,15 @@ export async function getGoogleAdsTrackingTargets(row: RawTrackingSettings | nul
 export async function getPublicTrackingConfig(): Promise<PublicTrackingConfig> {
   const row = await getRawTrackingSettings();
   const targets = await getGoogleAdsTrackingTargets(row).catch(() => []);
-  const containerId = configuredGoogleTagManager(row);
+  const effective = runtimeProviderSettings(row);
+  const containerId = effective.googleTagManagerEnabled ? effective.googleTagManagerId : null;
   return { googleAdsTargets: targets,
     googleTagManagerId: containerId,
     googleTagManagerEnabled: containerId !== null,
+    clarityProjectId: effective.clarityProjectId,
+    clarityEnabled: effective.clarityEnabled,
+    clarityConfigurationStatus: effective.clarityEnabled ? "configured" : "disabled",
+    clarityVerificationStatus: "not_verified",
     facebookPixelId: trackingString(row, "facebookPixelId"),
     gaMeasurementId: trackingString(row, "gaMeasurementId"),
     googleAdsConversionId: trackingString(row, "googleAdsConversionId"),

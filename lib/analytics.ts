@@ -13,7 +13,21 @@
  *   3. GTM dataLayer (`window.dataLayer`) — picked up by anything wired into GTM.
  */
 
+import { mayInitializeClarity } from "@/lib/tracking/clarity-privacy-policy";
+
 type AnyRecord = Record<string, unknown>;
+
+function engagementAllowed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return mayInitializeClarity(
+      window.location.pathname,
+      window.localStorage.getItem("goz_analytics_consent"),
+      window.location.search,
+    );
+  } catch { return false; }
+}
+
 
 declare global {
   interface Window {
@@ -24,7 +38,7 @@ declare global {
 
 /** Tag the current Clarity session with key=value (filterable, smart segments). */
 export function clarityTag(key: string, value: string | string[]): void {
-  if (typeof window === "undefined") return;
+  if (!engagementAllowed()) return;
   try {
     window.clarity?.("set", key, value);
   } catch {
@@ -34,7 +48,7 @@ export function clarityTag(key: string, value: string | string[]): void {
 
 /** Fire a custom Clarity event (filterable, alerts, smart segments). */
 export function clarityEvent(name: string): void {
-  if (typeof window === "undefined") return;
+  if (!engagementAllowed()) return;
   try {
     window.clarity?.("event", name);
   } catch {
@@ -49,7 +63,7 @@ export function clarityIdentify(
   pageId?: string,
   friendlyName?: string
 ): void {
-  if (typeof window === "undefined") return;
+  if (!engagementAllowed()) return;
   try {
     window.clarity?.("identify", userId, sessionId, pageId, friendlyName);
   } catch {
@@ -84,7 +98,7 @@ function isDataLayerBlockedPath(): boolean {
  * leg is suppressed — see `DATALAYER_BLOCKED_PATH_RE` for why.
  */
 export function trackEngagement(name: string, data?: AnyRecord): void {
-  if (typeof window === "undefined") return;
+  if (!engagementAllowed()) return;
 
   // Clarity — emit the event for filtering, and copy any string params as tags.
   clarityEvent(name);
