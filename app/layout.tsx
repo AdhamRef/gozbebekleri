@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import localFont from "next/font/local";
 import MicrosoftClarity from "@/components/MicrosoftClarity";
 import EngagementInstrumentation from "@/components/EngagementInstrumentation";
-import { Analytics } from "@vercel/analytics/next";
+import SessionRecordingConsent from "@/components/SessionRecordingConsent";
 import "./[locale]/globals.css";
 
 const poppins = localFont({
@@ -281,7 +281,7 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://i.ibb.co" />
         <link rel="preload" href="/bg.webp" as="image" type="image/webp" />
 
-        <script src="https://t.contentsquare.net/uxa/e81365186c19c.js" async />
+        {/* Contentsquare is disabled until it can be gated by independently verified consent. */}
       </head>
       <body
         className={`${poppins.variable} ${notoKufiArabic.variable} font-arabic antialiased`}
@@ -307,7 +307,7 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <EngagementInstrumentation />
         </Suspense>
-        <Analytics />
+        <SessionRecordingConsent />
       </body>
     </html>
   );
