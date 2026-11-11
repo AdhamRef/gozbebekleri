@@ -36,7 +36,11 @@ jobs:
         run: |
           npx prisma generate
           npx prisma generate --schema prisma/integration-settings.schema.prisma
-      - name: Read-only GET access and concurrent requests
+      - name: Install Chromium for real-browser API and cookie regression
+        run: npx playwright install --with-deps chromium
+      - name: Read-only GET access, concurrent PUT and Chromium regression
+        env:
+          QA_CHROMIUM: "1"
         run: node --conditions=react-server --import tsx scripts/qa-donation-get-guest-http-isolated.mjs
       - name: PUT authorization, future fields and committed update failures
         run: node --conditions=react-server --import tsx scripts/qa-donation-put-hotfix-http.mjs
