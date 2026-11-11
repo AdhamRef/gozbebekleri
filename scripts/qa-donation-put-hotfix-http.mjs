@@ -40,7 +40,7 @@ const donation={
 globalThis.fixture={session:null,failAudit:false,prisma:{
  donation:{findUnique:async({where})=>{reads++;if(failRead||(failPostUpdate&&reads>readFailAfter))throw Error("MONGO_SECRET_INTERNAL_FINANCIAL_MARKER");return where.id===id?structuredClone(donation):null;},
  update:async()=>{writes++;throw Error("Unexpected mutation")}},
- subscription:{update:async({data})=>{writes++;donation.subscription.status=data.status;return structuredClone(donation.subscription)}},
+ subscription:{updateMany:async({where,data})=>{if(donation.subscription.status!==where.status)return{count:0};writes++;donation.subscription.status=data.status;return{count:1}}},
  $transaction:async()=>{writes++;throw Error("Unexpected transaction")},
 }};
 const {PUT}=await import("../app/api/donations/[id]/route.ts");
@@ -176,6 +176,16 @@ try{
  failPostUpdate=false;
  assert.equal((await put({status:"ACTIVE"})).status,200);
  assert.equal(writes,beforeReloadWrites+1);passed++;
+ // Multiple identical concurrent requests must not mutate more than once.
+ globalThis.fixture.session={user:{id:owner,role:"DONOR"}};
+ donation.subscription.status="ACTIVE";
+ const beforeConcurrentWrites=writes;
+ const simultaneous=await Promise.all(Array.from({length:16},()=>put({status:"PAUSED"})));
+ assert.ok(simultaneous.every(r=>[200,409].includes(r.status)),JSON.stringify(simultaneous));
+ assert.equal(writes,beforeConcurrentWrites+1);passed++;
+ // Another change with stale subscription state may return 409; retry requires GET refresh.
+ assert.equal((await put({status:"PAUSED"})).status,200);
+ assert.equal(writes,beforeConcurrentWrites+1);passed++;
  console.log(JSON.stringify({summary:"DONATION_PUT_HOTFIX_HTTP_PASS",passed,authorizedWrites:writes,unauthorizedWrites:0}));
 }finally{
  await new Promise(ok=>server.close(ok));
