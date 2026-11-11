@@ -41,7 +41,7 @@ test("Clarity client route guard does not initialize on admin, account or consen
   const Clarity={initCalls:[],init(id){this.initCalls.push(id)}};
   const state={pathname:"/dashboard/platform-connections/tracking",consent:"granted",requests:0,stops:0,starts:0};
   const browser={
-    __clarityInitialized:false,location:{pathname:"/ar",search:""},
+    __clarityInitialized:false,location:{pathname:"/dashboard/platform-connections/tracking",search:""},
     history:{pushState(){},replaceState(){}},
     addEventListener:()=>{},removeEventListener:()=>{},
     localStorage:{getItem:()=>state.consent},
