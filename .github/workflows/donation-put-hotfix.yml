@@ -36,3 +36,6 @@ jobs:
       - run: npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
       - name: HTTP PUT owner and unauthorized caller regression
         run: node --conditions=react-server --import tsx scripts/qa-donation-put-hotfix-http.mjs
+
+      - name: HTTP contact messages conflict resolution regression
+        run: node --conditions=react-server --import tsx scripts/qa-message-hotfix-http.mjs
