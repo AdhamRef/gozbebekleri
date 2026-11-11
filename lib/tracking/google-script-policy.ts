@@ -1,8 +1,7 @@
+import { validateGtmContainerId } from "./provider-runtime-policy";
 /** GTM is an explicit operator setting, never a hard-coded legacy container. */
 export function googleTagManagerId(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const id = value.trim().toUpperCase();
-  return /^GTM-[A-Z0-9]+$/.test(id) ? id : null;
+  return validateGtmContainerId(value);
 }
 
 export function configuredGoogleTagManager(settings: Record<string, unknown> | null): string | null {
