@@ -123,6 +123,16 @@ try{
  }
  assert.doesNotMatch(x.text,/Existing Account Donor|private@example|SECRET_CITY|PRIVATE_STRIPE_NONCE|PROVIDER_INTERNAL_SECRET|4111111111111111/);
  pass("HTTP GET guest allows only explicit fields and does not reveal linked donor or provider records");
+ // OAuth sign-in may precede the signed guest claim. Receipt-cookie access must
+ // still work but must NOT reveal the unrelated linked user's name or email.
+ state.session={user:{id:stranger,role:"DONOR"}};
+ x=await call("GET",undefined,cookie);
+ assert.equal(x.status,200,JSON.stringify(x.payload));
+ assert.equal(x.payload.donor.id,null);
+ assert.equal(x.payload.donor.email,null);
+ assert.doesNotMatch(x.text,/Existing Account Donor|private@example/);
+ pass("OAuth-return guest access stays redacted before ownership claim");
+
 
  state.session={user:{id:owner,role:"DONOR"}};
  x=await call("GET");assert.equal(x.status,200);
