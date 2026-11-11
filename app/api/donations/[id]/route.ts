@@ -360,11 +360,19 @@ export async function PUT(
       return NextResponse.json(safeSubscriptionResponse(out), { headers: responseHeaders });
     }
 
-    // A state assignment is idempotent. A post-update audit/read failure must
-    // not return 500 and tempt the client to repeat an already successful write.
-    const updatedSubscription = await prisma.subscription.update({
-      where: { id: currentDonation.subscriptionId }, data: updates,
+    // Compare-and-set prevents concurrent requests from overwriting one
+    // another after both read the same subscription state. The caller must
+    // refresh GET when another operation wins the race.
+    const writeResult = await prisma.subscription.updateMany({
+      where: { id: currentDonation.subscriptionId!, status: sub.status },
+      data: updates,
     });
+    if (writeResult.count !== 1) {
+      return NextResponse.json({ error: 'SUBSCRIPTION_STATE_CONFLICT' }, {
+        status: 409, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+    const updatedSubscription = { ...sub, status: updates.status ?? sub.status };
     try {
       const subActor = isAdmin
         ? auditActorFromDashboardSession(session!)
