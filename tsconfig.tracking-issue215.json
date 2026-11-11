@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "strict": true,
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "types/next-auth.d.ts",
+    "lib/tracking/provider-runtime-policy.ts",
+    "lib/tracking/tracking-settings.ts",
+    "lib/tracking/google-script-policy.ts",
+    "app/api/admin/tracking/route.ts",
+    "app/api/tracking/config/route.ts",
+    "components/MicrosoftClarity.tsx",
+    "components/TrackingPixels.tsx",
+    "app/(dashboard)/dashboard/platform-connections/tracking/_components/TrackingSettingsManager.tsx"
+  ]
+}
