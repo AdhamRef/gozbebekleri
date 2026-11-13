@@ -6673,5 +6673,13 @@
  "تعذّر تحميل التقرير": "Could not load the report",
  "العودة إلى الحملات": "Back to campaigns",
  "نوع القالب لا يطابق هذا الاستخدام.": "The template type does not match this use.",
- "مرتبط بحدث تلقائي؛ أزل الارتباط لتغيير النوع.": "Linked to an automatic event. Remove the binding before changing the type."
+ "مرتبط بحدث تلقائي؛ أزل الارتباط لتغيير النوع.": "Linked to an automatic event. Remove the binding before changing the type.",
+ "حملة داخلية": "Internal campaign",
+ "القناة: ": "Channel: ",
+ "الحملة: ": "Campaign: ",
+ "نسخ بصيغة مُرمَّزة": "Copy encoded link",
+ "القالب محفوظ بالفعل، وفتحناه هنا. راجع حالته في Meta قبل أي تعديل.": "This template is already saved and is now open here. Check its Meta status before editing.",
+ "انقطع الاتصال قبل تأكيد الحفظ. أعدنا تحميل القالب؛ راجع حالته قبل إعادة المحاولة.": "The connection dropped before the save was confirmed. The template was reloaded; check its status before retrying.",
+ "تم حفظ القالب، لكن رد Meta استغرق وقتًا أطول. راجع حالة كل لغة في قائمة القوالب.": "Template saved, but Meta took longer to respond. Check each language's status in the template list.",
+ "تعذّر تأكيد الحفظ بسبب انقطاع الاتصال. تحقّق من قائمة القوالب قبل إعادة المحاولة حتى لا يتكرر الإرسال.": "The save could not be confirmed because the connection dropped. Check the template list before retrying so it is not submitted twice."
 }
