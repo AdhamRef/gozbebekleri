@@ -13,6 +13,7 @@ import {
   getUsdBaseRatesForServer,
 } from "@/lib/exchange/rates-service";
 import { decryptCard } from "@/lib/card-crypto";
+import { parseFallbackCard, stashFallbackCard } from "@/lib/payments/fallback-card";
 
 /** Convert any amount to TRY using USD-base rates from the database (same as donations). */
 async function toTRY(amount: number, fromCurrency: string): Promise<number> {
@@ -27,6 +28,10 @@ type InitiateBody = {
    *  in the returned fields by decrypting the stored card. Only the user's own cards
    *  are accepted. The browser still appends Cvv2 (CVC isn't stored). */
   savedCardId?: string;
+  /** The same card the browser posts to the bank, kept (encrypted, ~20 min) so a
+   *  PayFor failure can be retried on Stripe automatically. For a saved card only
+   *  `cvc` is needed — the rest comes from the decrypted saved card. */
+  fallbackCard?: { number?: string; expiry?: string; cvc?: string; holder?: string };
 };
 
 export async function POST(req: NextRequest) {
@@ -68,6 +73,13 @@ export async function POST(req: NextRequest) {
     if (donation.status === "FAILED") {
       return NextResponse.json(
         { error: `Donation has already failed (status=${donation.status})` },
+        { status: 400 }
+      );
+    }
+    // PayFor has no recurring billing — monthly donations are Stripe-only.
+    if (donation.subscriptionId) {
+      return NextResponse.json(
+        { error: "Monthly donations are processed by Stripe." },
         { status: 400 }
       );
     }
@@ -213,9 +225,35 @@ export async function POST(req: NextRequest) {
       formFields.CardHolderName = savedCard.cardholderName ?? "";
     }
 
+    // Keep the card for an automatic Stripe retry if PayFor fails. Best-effort:
+    // a stash failure must never block the PayFor attempt itself.
+    const fallbackCard = parseFallbackCard(
+      savedCardId
+        ? {
+            number: formFields.Pan,
+            expiry: formFields.Expiry,
+            cvc: body.fallbackCard?.cvc,
+            holder: formFields.CardHolderName,
+          }
+        : {
+            number: body.fallbackCard?.number,
+            expiry: body.fallbackCard?.expiry,
+            cvc: body.fallbackCard?.cvc,
+            holder: body.fallbackCard?.holder,
+          }
+    );
+    if (fallbackCard) {
+      try {
+        await stashFallbackCard(donation.id, fallbackCard);
+      } catch (e) {
+        console.error("[PayFor INITIATE] could not stash fallback card", e instanceof Error ? e.message : e);
+      }
+    }
+
     console.log("[PayFor INITIATE] Sending fields to bank:", {
       ...formFields,
       UserPass: "***",
+      ...(formFields.Pan ? { Pan: `****${formFields.Pan.slice(-4)}` } : {}),
     });
 
     return NextResponse.json({

@@ -1,7 +1,6 @@
-import { after, NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { dispatchEvent } from "@/lib/events/dispatch";
-import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
+import { handlePayForFailure } from "@/lib/payments/payfor-stripe-fallback";
 
 export async function POST(req: NextRequest) {
   const origin = new URL(req.url).origin;
@@ -26,35 +25,40 @@ export async function POST(req: NextRequest) {
   try {
     const donation = await prisma.donation.findUnique({
       where: { id: donationId },
+      select: { paidAt: true, providerOrderId: true },
+    });
+    if (!donation) {
+      return NextResponse.redirect(new URL(`/${locale}/donation-failed`, origin));
+    }
+    if (donation.paidAt !== null) {
+      return NextResponse.redirect(new URL(`/${locale}/success/${donationId}`, origin));
+    }
+
+    // Record PayFor's answer but do NOT mark FAILED yet — the donation is retried
+    // on Stripe first; markDonationFailedFinal runs only if that fails too.
+    await prisma.donation.update({
+      where: { id: donationId },
+      data: {
+        provider: "PAYFOR",
+        providerOrderId: donation.providerOrderId ?? orderId ?? null,
+        providerProcReturnCode: procReturnCode || null,
+        providerTxnResult: txnResult || null,
+        providerErrorMessage: errorMessage || null,
+        providerRaw: raw as Record<string, unknown>,
+      },
     });
 
-    if (donation && donation.paidAt === null) {
-      await prisma.donation.update({
-        where: { id: donationId },
-        data: {
-          status: "FAILED",
-          provider: "PAYFOR",
-          providerOrderId: donation.providerOrderId ?? orderId ?? null,
-          providerProcReturnCode: procReturnCode || null,
-          providerTxnResult: txnResult || null,
-          providerErrorMessage: errorMessage || null,
-          providerRaw: raw as Record<string, unknown>,
-        },
-      });
-      after(() => dispatchEvent("DONATION_FAILED", { donationId }));
-      // Seed Meta with the failed attempt so lookalike audiences can include
-      // donors-who-tried. Browser pixel fires the matching DonateFailed hit
-      // with event_id `${donationId}_failed` — same id here for dedup.
-      void sendDonationFailedConversions(donationId);
-    }
+    const next = await handlePayForFailure({
+      donationId,
+      locale,
+      origin: process.env.APP_URL?.replace(/\/$/, "") ?? origin,
+      payforError: errorMessage,
+    });
+    return NextResponse.redirect(next);
   } catch (e) {
     console.error("[PayFor FAIL] Callback error:", e);
+    return NextResponse.redirect(
+      new URL(`/${locale}/donation-failed?donationId=${encodeURIComponent(donationId)}`, origin)
+    );
   }
-
-  return NextResponse.redirect(
-    new URL(
-      `/${locale}/donation-failed?donationId=${encodeURIComponent(donationId)}`,
-      origin
-    )
-  );
 }

@@ -247,15 +247,15 @@ const DonationDialog = ({
   const stripeFormRef = useRef<StripePaymentHandle | null>(null);
   // Stable callback — prevents useEffect loop inside StripePaymentStep
   const onStripeReadyChange = useCallback((ready: boolean) => setStripeReady(ready), []);
-  // Auto-select PayFor when ONE_TIME + TL, Stripe otherwise. Fallback secret forces Stripe.
+  // Gateway routing: every ONE_TIME card donation (any currency — the server
+  // converts to TRY) goes to PayFor, and if PayFor fails the server retries the
+  // same card on Stripe automatically (lib/payments/payfor-stripe-fallback.ts).
+  // MONTHLY is Stripe-only. The admin kill-switch (GlobalSettings.payforEnabled)
+  // forces Stripe for everything when off.
   const [fallbackClientSecret, setFallbackClientSecret] = useState<string | null>(null);
-  // use3D is derived: PayFor when one-time TL donation (no manual override).
-  // The admin kill-switch (GlobalSettings.payforEnabled) forces Stripe across
-  // every currency and scenario when off.
   const use3D =
     payforEnabled &&
     donationType === "ONE_TIME" &&
-    getCurrency() === "TRY" &&
     !fallbackClientSecret;
   const [fallbackDonationId, setFallbackDonationId] = useState<string | null>(null);
   // Guard against duplicate fallback execution
@@ -1801,10 +1801,20 @@ const DonationDialog = ({
         if (paymentMethod === "CARD" && use3D) {
             // Saved card: server decrypts PAN + uses stored Expiry/CardHolderName.
             // New card: server returns base fields; browser appends Pan/Expiry/CardHolderName/Cvv2.
+            // fallbackCard: same card, kept encrypted server-side for a few minutes
+            // so a PayFor failure is retried on Stripe without re-typing it.
             const init = await axios.post("/api/payfor/3dpay/initiate", {
               donationId,
               locale,
               savedCardId: selectedCardId ?? undefined,
+              fallbackCard: selectedCardId
+                ? { cvc: cardDetails.cvv }
+                : {
+                    number: cardDetails.cardNumber,
+                    expiry: cardDetails.expiryDate,
+                    cvc: cardDetails.cvv,
+                    holder: cardDetails.cardholderName,
+                  },
             });
             const { actionUrl, fields } = init.data as {
               actionUrl: string;
@@ -1886,10 +1896,10 @@ const DonationDialog = ({
 
 
             let polls = 0;
-            // 60 polls × 2s = 120s. Mobile users routinely need >50s for the SMS-OTP step
-            // of 3D Secure; the previous 25-poll ceiling was firing the failure redirect
-            // while the bank popup was still authenticating.
-            const FALLBACK_AFTER_POLLS = 60;
+            // 150 polls × 2s = 5 min. Covers the bank's 3D Secure SMS step plus, if PayFor
+            // fails, a second 3D Secure step on the automatic Stripe retry — the popup
+            // walks through both and ends on /success or /donation-failed.
+            const FALLBACK_AFTER_POLLS = 150;
 
             payforPollRef.current = setInterval(async () => {
               polls++;

@@ -8,6 +8,7 @@ import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-co
 // because failed donors typically never reach a /success-style page.
 import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
+import { markDonationPaidByStripeIntent } from "@/lib/payments/donation-outcome";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 
@@ -404,41 +405,8 @@ export async function POST(req: NextRequest) {
         const donationId = intent.metadata?.donationId;
         if (!donationId) break;
 
-        await prisma.$transaction(async (tx) => {
-          const donation = await tx.donation.findUnique({
-            where: { id: donationId },
-            include: { items: true, categoryItems: true },
-          });
-          // Idempotency: the row is created with status=PAID by /api/stripe/intent
-          // before Stripe confirms payment, so we key off paidAt (only set here).
-          if (!donation || donation.paidAt != null) return;
-
-          await tx.donation.update({
-            where: { id: donationId },
-            data: {
-              status: "PAID",
-              paidAt: new Date(),
-              provider: "STRIPE",
-              providerOrderId: intent.id,
-              providerAuthCode: intent.id,
-              providerTxnResult: "Success",
-              providerRaw: intent as never,
-            },
-          });
-
-          for (const item of donation.items) {
-            await tx.campaign.update({
-              where: { id: item.campaignId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-            });
-          }
-          for (const item of donation.categoryItems) {
-            await tx.category.update({
-              where: { id: item.categoryId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-            });
-          }
-        });
+        // Idempotent on paidAt — the PayFor→Stripe fallback may have credited it already.
+        await markDonationPaidByStripeIntent(donationId, intent);
         after(() => dispatchDonationPaid(donationId));
         break;
       }

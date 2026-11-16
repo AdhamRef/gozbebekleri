@@ -10,7 +10,9 @@ import { prisma } from "@/lib/prisma";
 // DonateFailed stays here so abandoned-card lookalike audiences still
 // get the signal on bank rejects.
 import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
-import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
+import { dispatchDonationPaid } from "@/lib/events/dispatch";
+import { discardFallbackCard } from "@/lib/payments/fallback-card";
+import { handlePayForFailure } from "@/lib/payments/payfor-stripe-fallback";
 
 export async function POST(req: NextRequest) {
   const origin = new URL(req.url).origin;
@@ -69,10 +71,12 @@ export async function POST(req: NextRequest) {
 
       const isSuccess = procReturnCode === "00" || txnResult.toLowerCase() === "success";
       if (!isSuccess) {
+        // Record PayFor's answer but do NOT mark FAILED — handlePayForFailure
+        // (below) retries on Stripe first and only fails the donation if that
+        // fails too.
         await tx.donation.update({
           where: { id: donation.id },
           data: {
-            status: "FAILED",
             provider: "PAYFOR",
             providerProcReturnCode: procReturnCode || null,
             providerTxnResult: txnResult || null,
@@ -82,7 +86,7 @@ export async function POST(req: NextRequest) {
             providerRaw: raw as any,
           },
         });
-        return { ok: false as const, reason: "failed" as const };
+        return { ok: false as const, reason: "failed" as const, errorMessage: errorMessage || "Payment failed" };
       }
 
       await tx.donation.update({
@@ -118,14 +122,23 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.ok) {
+      // PayFor took the payment — the Stripe fallback card is no longer needed.
+      await discardFallbackCard(donationId).catch(() => {});
       after(() => dispatchDonationPaid(donationId));
       return NextResponse.redirect(new URL(`/${locale}/success/${donationId}`, origin));
     }
     if (result.reason === "failed") {
-      after(() => dispatchEvent("DONATION_FAILED", { donationId }));
-      void sendDonationFailedConversions(donationId);
+      const next = await handlePayForFailure({
+        donationId,
+        locale,
+        origin: process.env.APP_URL?.replace(/\/$/, "") ?? origin,
+        payforError: result.errorMessage,
+      });
+      return NextResponse.redirect(next);
     }
     if (result.reason === "order_mismatch") {
+      // Suspicious response — never retry it on another gateway.
+      await discardFallbackCard(donationId).catch(() => {});
       void sendDonationFailedConversions(donationId);
     }
 

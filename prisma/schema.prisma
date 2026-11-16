@@ -56,6 +56,22 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+/// Card details held ONLY for the few minutes between a PayFor 3D attempt and its
+/// result, so a PayFor failure can be retried on Stripe without the donor re-typing
+/// the card. `payload` is AES-encrypted (lib/card-crypto). A row is deleted the moment
+/// it is used, when PayFor succeeds, or once `expiresAt` passes.
+/// See lib/payments/payfor-stripe-fallback.ts.
+model PaymentFallbackCard {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  donationId String   @db.ObjectId
+  payload    String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([donationId])
+  @@index([expiresAt])
+}
+
 model OtpCode {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   email     String
