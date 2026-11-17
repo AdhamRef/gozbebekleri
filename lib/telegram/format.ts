@@ -159,7 +159,8 @@ export function formatDonationNotification(
   // ⭐ = first-time donor. Inline on the donor line rather than a second message.
   lines.push(`👤 <b>المتبرع:</b> ${options.isNewDonor ? "⭐ " : ""}${donorLine(d.donor)}`);
   lines.push(`🌍 <b>الدولة:</b> ${countryLine(d.donorCountryCode)}`);
-  lines.push(`🎯 <b>الوجهة:</b> ${targetLine(d)}`);
+  // The donated campaign is intentionally left out of the automatic notification;
+  // it is still shown by the /donation <id> command (formatDonationDetails).
   lines.push(
     `🏦 <b>البوابة:</b> ${htmlEscape(providerLabel(d))}${
       d.subscriptionId ? " · 🔁 شهري" : ""
@@ -188,7 +189,7 @@ export function formatDonationNotification(
 export function formatDonationDetails(d: FormattableDonation): string {
   // For details we want everything — reuse notification + raw fields the brief skips.
   const base = formatDonationNotification(d);
-  const extras: string[] = [];
+  const extras: string[] = [`🎯 <b>الوجهة:</b> ${targetLine(d)}`];
   if (d.providerOrderId) extras.push(`🆔 <b>Order ID:</b> <code>${htmlEscape(d.providerOrderId)}</code>`);
   if (d.teamSupport && d.teamSupport > 0) {
     extras.push(`🤝 <b>دعم الفريق:</b> ${htmlEscape(formatMoneyLocal(d.teamSupport, d.currency))}`);
@@ -196,7 +197,7 @@ export function formatDonationDetails(d: FormattableDonation): string {
   if (d.fees && d.fees > 0) {
     extras.push(`💳 <b>الرسوم:</b> ${htmlEscape(formatMoneyLocal(d.fees, d.currency))}`);
   }
-  return extras.length > 0 ? `${base}\n\n${extras.join("\n")}` : base;
+  return `${base}\n\n${extras.join("\n")}`;
 }
 
 // ───────────────────────────────────────────────────────────── stats blocks ──
