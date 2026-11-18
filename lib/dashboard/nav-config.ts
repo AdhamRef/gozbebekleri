@@ -112,6 +112,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // grant UI. It is an outbound integration, so it sits under platformConnections with the
       // other providers. Donation notifications depend on this page being configurable.
       { key: "platformConnections", title: "تيليجرام", href: "/dashboard/telegram", icon: "send", keywords: ["telegram", "bot", "notifications"] },
+      { key: "siteContent", get title() { return dt("معرض لقطات من الميدان"); }, href: "/dashboard/gallery", icon: "images", adminOnly: true, keywords: ["gallery", "photos", "images", "field", "email", "معرض", "صور", "لقطات"] },
     ],
   },
   {
