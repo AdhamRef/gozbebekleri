@@ -6681,5 +6681,11 @@
  "القالب محفوظ بالفعل، وفتحناه هنا. راجع حالته في Meta قبل أي تعديل.": "This template is already saved and is now open here. Check its Meta status before editing.",
  "انقطع الاتصال قبل تأكيد الحفظ. أعدنا تحميل القالب؛ راجع حالته قبل إعادة المحاولة.": "The connection dropped before the save was confirmed. The template was reloaded; check its status before retrying.",
  "تم حفظ القالب، لكن رد Meta استغرق وقتًا أطول. راجع حالة كل لغة في قائمة القوالب.": "Template saved, but Meta took longer to respond. Check each language's status in the template list.",
- "تعذّر تأكيد الحفظ بسبب انقطاع الاتصال. تحقّق من قائمة القوالب قبل إعادة المحاولة حتى لا يتكرر الإرسال.": "The save could not be confirmed because the connection dropped. Check the template list before retrying so it is not submitted twice."
+ "تعذّر تأكيد الحفظ بسبب انقطاع الاتصال. تحقّق من قائمة القوالب قبل إعادة المحاولة حتى لا يتكرر الإرسال.": "The save could not be confirmed because the connection dropped. Check the template list before retrying so it is not submitted twice.",
+ "كل المصادر": "All sources",
+ "فيسبوك": "Facebook",
+ "إنستغرام": "Instagram",
+ "إعلانات Google": "Google Ads",
+ "بحث Google": "Google Search",
+ "تيك توك": "TikTok"
 }
