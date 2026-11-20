@@ -92,7 +92,7 @@ export function DashboardTopbar({ crumbs, onOpenSidebar, onOpenSearch, dir, show
         </button>
         {showWhatsappInbox && (
           <Link
-            href="/dashboard/communication/inbox"
+            href="/dashboard/communication/conversations"
             className={cn(
               "relative inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-all",
               whatsappInboxCount > 0
