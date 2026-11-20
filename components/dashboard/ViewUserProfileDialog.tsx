@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import * as React from "react";
 import axios from "axios";
@@ -637,6 +638,14 @@ export function ViewUserProfileDialog({
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Open the donor's WhatsApp conversation (#274). */}
+                {canMessage && user.phone && (
+                  <Button asChild size="sm" variant="outline" className="h-8 gap-1.5">
+                    <Link href={`/dashboard/communication/conversations?phone=${encodeURIComponent(user.phone)}`} onClick={() => onOpenChange(false)}>
+                      <MessageCircle className="h-3.5 w-3.5" />محادثة واتساب
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   onClick={() => setSmartWhatsappOpen(true)}
