@@ -46,6 +46,7 @@ import { useCurrency } from "@/context/CurrencyContext";
 import { cn } from "@/lib/utils";
 import { ACTION_PERMISSION_ROWS, DASHBOARD_PERMISSION_ROWS } from "@/lib/dashboard/nav-config";
 import type { UserProfileCardData } from "@/lib/dashboard/user-profile-card";
+import DonorContactStatus from "@/components/dashboard/DonorContactStatus";
 import { resolveUserCountry } from "@/lib/dashboard/resolve-user-country";
 import {
   GENDER_LABEL_AR,
@@ -452,6 +453,9 @@ export function ViewUserProfileDialog({
                   value={user.lastDonationAt ? formatDateAr(user.lastDonationAt) : "—"}
                 />
               </div>
+
+              {/* Per-channel communication state of this donor (#275). */}
+              {user.role === "DONOR" && <DonorContactStatus userId={user.id} />}
 
               {/* Two-column info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
