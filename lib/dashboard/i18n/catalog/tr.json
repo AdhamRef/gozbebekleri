@@ -6939,5 +6939,15 @@
  "غير المقروءة": "Okunmamış",
  "المسؤول": "Sorumlu",
  "تصنيفات المتبرعين": "Bağışçı kategorileri",
- "الأمان وسجل الوصول": "Güvenlik ve erişim günlüğü"
+ "الأمان وسجل الوصول": "Güvenlik ve erişim günlüğü",
+ "رسالة واتساب جديدة": "Yeni WhatsApp mesajı",
+ "لديك {0} محادثة غير مقروءة": "{0} okunmamış konuşmanız var",
+ "التنبيهات مفعّلة": "Bildirimler açık",
+ "التنبيهات متوقفة": "Bildirimler kapalı",
+ "تفعيل إشعارات المتصفح": "Tarayıcı bildirimlerini aç",
+ "إشعارات المتصفح محجوبة من إعدادات المتصفح": "Tarayıcı bildirimleri tarayıcı ayarlarında engelli",
+ "لا ردود جاهزة لهذه اللغة بعد": "Bu dil için henüz hazır yanıt yok",
+ "عنوان الرد": "Yanıt başlığı",
+ "حفظ كرد جاهز": "Hazır yanıt olarak kaydet",
+ "الردود الجاهزة": "Hazır yanıtlar"
 }
