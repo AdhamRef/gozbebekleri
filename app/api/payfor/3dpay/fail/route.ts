@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handlePayForFailure } from "@/lib/payments/payfor-stripe-fallback";
+import { isGenuinePayForCallback, redactPayForResponse } from "@/lib/payfor";
 
 export async function POST(req: NextRequest) {
   const origin = new URL(req.url).origin;
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const raw = Object.fromEntries(form.entries());
 
-  console.error("[PayFor FAIL] Bank response:", JSON.stringify(raw, null, 2));
+  console.error("[PayFor FAIL] Bank response:", JSON.stringify(redactPayForResponse(raw), null, 2));
 
   const orderId = String(raw.OrderId || raw.orderId || "");
   const procReturnCode = String(raw.ProcReturnCode || raw.procReturnCode || "");
@@ -25,13 +26,21 @@ export async function POST(req: NextRequest) {
   try {
     const donation = await prisma.donation.findUnique({
       where: { id: donationId },
-      select: { paidAt: true, providerOrderId: true },
+      select: { id: true, paidAt: true, providerOrderId: true },
     });
     if (!donation) {
       return NextResponse.redirect(new URL(`/${locale}/donation-failed`, origin));
     }
     if (donation.paidAt !== null) {
       return NextResponse.redirect(new URL(`/${locale}/success/${donationId}`, origin));
+    }
+
+    // SECURITY: a forged failure POST must not touch the donation or trigger the Stripe retry.
+    if (!isGenuinePayForCallback(raw, donation, process.env.PAYFOR_MERCHANT_PASS)) {
+      console.error("[PayFor FAIL] callback not authenticated; donation left unchanged", { donationId });
+      return NextResponse.redirect(
+        new URL(`/${locale}/donation-failed?donationId=${encodeURIComponent(donationId)}`, origin)
+      );
     }
 
     // Record PayFor's answer but do NOT mark FAILED yet — the donation is retried

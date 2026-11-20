@@ -13,6 +13,7 @@ import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversio
 import { dispatchDonationPaid } from "@/lib/events/dispatch";
 import { discardFallbackCard } from "@/lib/payments/fallback-card";
 import { handlePayForFailure } from "@/lib/payments/payfor-stripe-fallback";
+import { isGenuinePayForCallback, PAYFOR_UNVERIFIED_APPROVAL, redactPayForResponse, verifyPayForResponseHash } from "@/lib/payfor";
 
 export async function POST(req: NextRequest) {
   const origin = new URL(req.url).origin;
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
   const raw = Object.fromEntries(form.entries());
 
   // Log full bank response for debugging
-  console.log("[PayFor OK] Bank response:", JSON.stringify(raw, null, 2));
+  console.log("[PayFor OK] Bank response:", JSON.stringify(redactPayForResponse(raw), null, 2));
 
   const orderId = String(raw.OrderId || raw.orderId || "");
   const procReturnCode = String(raw.ProcReturnCode || raw.ProcReturnCode?.toString?.() || raw.procReturnCode || "");
@@ -50,6 +51,13 @@ export async function POST(req: NextRequest) {
 
       // Idempotency: if already confirmed by a prior callback, just redirect to success
       if (donation.paidAt !== null) return { ok: true as const };
+
+      // SECURITY: nothing changes unless the callback is genuine and about this donation
+      // (bank signature, or our own request signature echoed back). A forged POST is ignored.
+      if (!isGenuinePayForCallback(raw, donation, process.env.PAYFOR_MERCHANT_PASS)) {
+        console.error("[PayFor OK] callback not authenticated; donation left unchanged", { donationId: donation.id, procReturnCode });
+        return { ok: false as const, reason: "unverified" as const };
+      }
 
       // Basic linkage check
       if (donation.providerOrderId && orderId && donation.providerOrderId !== orderId) {
@@ -87,6 +95,17 @@ export async function POST(req: NextRequest) {
           },
         });
         return { ok: false as const, reason: "failed" as const, errorMessage: errorMessage || "Payment failed" };
+      }
+
+      // An approval only counts when the bank signed it. "00" without a valid ResponseHash is
+      // not proof of payment: leave the donation unconfirmed (never FAILED) for manual reconciliation.
+      if (!verifyPayForResponseHash(raw, process.env.PAYFOR_MERCHANT_PASS)) {
+        console.error("[PayFor OK] ResponseHash did not verify; donation left unconfirmed", { donationId: donation.id, procReturnCode });
+        await tx.donation.update({
+          where: { id: donation.id },
+          data: { providerErrorMessage: PAYFOR_UNVERIFIED_APPROVAL, providerRaw: raw as any },
+        });
+        return { ok: false as const, reason: "unverified" as const };
       }
 
       await tx.donation.update({
