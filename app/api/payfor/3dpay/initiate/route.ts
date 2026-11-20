@@ -13,7 +13,6 @@ import {
   getUsdBaseRatesForServer,
 } from "@/lib/exchange/rates-service";
 import { decryptCard } from "@/lib/card-crypto";
-import { parseFallbackCard, stashFallbackCard } from "@/lib/payments/fallback-card";
 
 /** Convert any amount to TRY using USD-base rates from the database (same as donations). */
 async function toTRY(amount: number, fromCurrency: string): Promise<number> {
@@ -225,30 +224,10 @@ export async function POST(req: NextRequest) {
       formFields.CardHolderName = savedCard.cardholderName ?? "";
     }
 
-    // Keep the card for an automatic Stripe retry if PayFor fails. Best-effort:
-    // a stash failure must never block the PayFor attempt itself.
-    const fallbackCard = parseFallbackCard(
-      savedCardId
-        ? {
-            number: formFields.Pan,
-            expiry: formFields.Expiry,
-            cvc: body.fallbackCard?.cvc,
-            holder: formFields.CardHolderName,
-          }
-        : {
-            number: body.fallbackCard?.number,
-            expiry: body.fallbackCard?.expiry,
-            cvc: body.fallbackCard?.cvc,
-            holder: body.fallbackCard?.holder,
-          }
-    );
-    if (fallbackCard) {
-      try {
-        await stashFallbackCard(donation.id, fallbackCard);
-      } catch (e) {
-        console.error("[PayFor INITIATE] could not stash fallback card", e instanceof Error ? e.message : e);
-      }
-    }
+    // No card data is kept server-side. A PayFor failure is retried on Stripe by the
+    // donor through Stripe Checkout (see /donation-failed), never by sending the PAN
+    // to Stripe from our server — that requires "raw card data" access, which this
+    // Stripe account does not have, and keeping the CVC would breach PCI DSS.
 
     console.log("[PayFor INITIATE] Sending fields to bank:", {
       ...formFields,

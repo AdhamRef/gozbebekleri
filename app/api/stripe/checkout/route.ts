@@ -16,12 +16,10 @@ type CheckoutBody = {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    // Without this, an expired/absent session reached `session.user.id` below and threw
-    // `TypeError: Cannot read properties of null` — surfacing as an opaque 500 on the payment
-    // path instead of a 401 the client can act on by re-authenticating.
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Guests have no session: like /api/stripe/charge and /api/donations/[id]/retry,
+    // the donation id is the access token. Signed-in donors must own the donation.
+    const userId = session?.user?.id ?? null;
+    const userEmail = session?.user?.email ?? undefined;
 
     const body = (await req.json()) as Partial<CheckoutBody>;
     const donationId = String(body.donationId || "").trim();
@@ -41,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (!donation) {
       return NextResponse.json({ error: "Donation not found" }, { status: 404 });
     }
-    if (donation.donorId !== session.user.id) {
+    if (userId && donation.donorId !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (donation.status === "FAILED") {
@@ -71,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     const metadata: Record<string, string> = {
       donationId,
-      userId: session.user.id,
+      ...(userId ? { userId } : {}),
     };
     if (donation.subscriptionId) {
       metadata.subscriptionDbId = donation.subscriptionId;
@@ -103,7 +101,7 @@ export async function POST(req: NextRequest) {
         subscription_data: {
           metadata,
         },
-        customer_email: session.user.email ?? undefined,
+        customer_email: userEmail,
       });
     } else {
       // One-time payment mode
@@ -125,7 +123,7 @@ export async function POST(req: NextRequest) {
         success_url: successUrl,
         cancel_url: cancelUrl,
         metadata,
-        customer_email: session.user.email ?? undefined,
+        customer_email: userEmail,
       });
     }
 

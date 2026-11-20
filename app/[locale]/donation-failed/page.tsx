@@ -176,17 +176,10 @@ export default function DonationFailedPage() {
       const newId = res.data?.id as string | undefined;
       if (!newId) throw new Error("retry returned no id");
 
-      // Pick the next-step URL by provider. STRIPE → checkout session URL.
-      // PAYFOR (TRY) → /api/payfor/3dpay/initiate which renders a 3DS form;
-      // it expects a card — easier to send them back to the campaign dialog.
-      // Default to Stripe for everything that's not PayFor.
-      const provider = (donation.provider ?? "STRIPE").toUpperCase();
-      if (provider === "PAYFOR") {
-        // PayFor needs card details — bounce to /campaigns so the dialog opens.
-        toast.success(t("retry.payforHint"));
-        router.push("/campaigns");
-        return;
-      }
+      // Every one-time retry goes to Stripe Checkout — including a donation the
+      // Turkish bank (PayFor) declined: PayFor is the first gateway for all
+      // currencies and Stripe is the fallback for its failures. Checkout charges
+      // in the donation's own currency and handles 3D Secure on Stripe's page.
 
       // Stripe path — create a new Checkout Session and redirect.
       const checkout = await axios.post("/api/stripe/checkout", {
