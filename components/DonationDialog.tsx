@@ -1801,20 +1801,24 @@ const DonationDialog = ({
         if (paymentMethod === "CARD" && use3D) {
             // Saved card: server decrypts PAN + uses stored Expiry/CardHolderName.
             // New card: server returns base fields; browser appends Pan/Expiry/CardHolderName/Cvv2.
-            // fallbackCard: same card, kept encrypted server-side for a few minutes
-            // so a PayFor failure is retried on Stripe without re-typing it.
+            // fallbackCard is only sent when the automatic raw-card Stripe retry is on
+            // (kept encrypted server-side for a few minutes). Otherwise a PayFor
+            // decline goes to Stripe's hosted Checkout and the card never touches
+            // our server.
             const init = await axios.post("/api/payfor/3dpay/initiate", {
               donationId,
               locale,
               savedCardId: selectedCardId ?? undefined,
-              fallbackCard: selectedCardId
-                ? { cvc: cardDetails.cvv }
-                : {
-                    number: cardDetails.cardNumber,
-                    expiry: cardDetails.expiryDate,
-                    cvc: cardDetails.cvv,
-                    holder: cardDetails.cardholderName,
-                  },
+              ...(process.env.NEXT_PUBLIC_PAYFOR_RAW_CARD_FALLBACK === "true" && {
+                fallbackCard: selectedCardId
+                  ? { cvc: cardDetails.cvv }
+                  : {
+                      number: cardDetails.cardNumber,
+                      expiry: cardDetails.expiryDate,
+                      cvc: cardDetails.cvv,
+                      holder: cardDetails.cardholderName,
+                    },
+              }),
             });
             const { actionUrl, fields } = init.data as {
               actionUrl: string;

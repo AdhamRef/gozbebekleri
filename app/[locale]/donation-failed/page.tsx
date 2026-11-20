@@ -176,19 +176,10 @@ export default function DonationFailedPage() {
       const newId = res.data?.id as string | undefined;
       if (!newId) throw new Error("retry returned no id");
 
-      // Pick the next-step URL by provider. STRIPE → checkout session URL.
-      // PAYFOR (TRY) → /api/payfor/3dpay/initiate which renders a 3DS form;
-      // it expects a card — easier to send them back to the campaign dialog.
-      // Default to Stripe for everything that's not PayFor.
-      const provider = (donation.provider ?? "STRIPE").toUpperCase();
-      if (provider === "PAYFOR") {
-        // PayFor needs card details — bounce to /campaigns so the dialog opens.
-        toast.success(t("retry.payforHint"));
-        router.push("/campaigns");
-        return;
-      }
-
-      // Stripe path — create a new Checkout Session and redirect.
+      // Every retry (PayFor or Stripe failure) pays the new copy on Stripe's hosted
+      // Checkout — same donation, the donor just enters a card there. (PayFor used to
+      // bounce to /campaigns here, which left the copy unpaid as "pending" forever.)
+      // Guests are supported for one-time donations.
       const checkout = await axios.post("/api/stripe/checkout", {
         donationId: newId,
         locale,

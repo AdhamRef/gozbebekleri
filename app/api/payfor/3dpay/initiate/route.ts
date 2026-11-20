@@ -14,6 +14,7 @@ import {
 } from "@/lib/exchange/rates-service";
 import { decryptCard } from "@/lib/card-crypto";
 import { parseFallbackCard, stashFallbackCard } from "@/lib/payments/fallback-card";
+import { rawCardFallbackEnabled } from "@/lib/payments/payfor-stripe-fallback";
 
 /** Convert any amount to TRY using USD-base rates from the database (same as donations). */
 async function toTRY(amount: number, fromCurrency: string): Promise<number> {
@@ -242,7 +243,9 @@ export async function POST(req: NextRequest) {
             holder: body.fallbackCard?.holder,
           }
     );
-    if (fallbackCard) {
+    // Only held when the automatic raw-card Stripe retry is switched on; otherwise
+    // the PayFor failure goes to hosted Stripe Checkout and no card is kept.
+    if (fallbackCard && rawCardFallbackEnabled()) {
       try {
         await stashFallbackCard(donation.id, fallbackCard);
       } catch (e) {

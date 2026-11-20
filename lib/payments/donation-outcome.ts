@@ -1,8 +1,19 @@
 import { after } from "next/server";
 import type Stripe from "stripe";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { dispatchEvent } from "@/lib/events/dispatch";
 import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
+
+/**
+ * "Not paid yet" for a filter. Donation rows are created WITHOUT a paidAt field at
+ * all, and on MongoDB Prisma's `paidAt: null` does not match a missing field — so a
+ * bare `paidAt: null` filter silently matches nothing (this left every declined
+ * PayFor donation stuck as "pending"). Always use this instead.
+ */
+export const PAID_AT_UNSET = {
+  OR: [{ paidAt: null }, { paidAt: { isSet: false } }],
+} satisfies Prisma.DonationWhereInput;
 
 /**
  * Credit a donation paid by a direct Stripe PaymentIntent: set PAID + paidAt and
@@ -68,7 +79,7 @@ export async function markDonationFailedFinal(
   }
 ): Promise<boolean> {
   const { count } = await prisma.donation.updateMany({
-    where: { id: donationId, paidAt: null, status: { not: "FAILED" } },
+    where: { id: donationId, status: { not: "FAILED" }, ...PAID_AT_UNSET },
     data: {
       status: "FAILED",
       provider: data.provider,

@@ -16,12 +16,6 @@ type CheckoutBody = {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    // Without this, an expired/absent session reached `session.user.id` below and threw
-    // `TypeError: Cannot read properties of null` — surfacing as an opaque 500 on the payment
-    // path instead of a 401 the client can act on by re-authenticating.
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const body = (await req.json()) as Partial<CheckoutBody>;
     const donationId = String(body.donationId || "").trim();
@@ -35,14 +29,26 @@ export async function POST(req: NextRequest) {
         items: { include: { campaign: { select: { title: true } } } },
         categoryItems: { include: { category: { select: { name: true } } } },
         subscription: true,
+        donor: { select: { email: true } },
       },
     });
 
     if (!donation) {
       return NextResponse.json({ error: "Donation not found" }, { status: 404 });
     }
-    if (donation.donorId !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Guests (most donors) may pay a ONE-TIME donation they hold the id of — the same
+    // "donation id = access token" model as /api/donations/[id]/retry and the success
+    // page; it can only ever charge that donation's own amount. Monthly still needs
+    // a signed-in owner.
+    if (session?.user?.id) {
+      if (donation.donorId !== session.user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else if (donation.subscriptionId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (donation.paidAt) {
+      return NextResponse.json({ error: "Donation already paid" }, { status: 400 });
     }
     if (donation.status === "FAILED") {
       return NextResponse.json(
@@ -71,8 +77,9 @@ export async function POST(req: NextRequest) {
 
     const metadata: Record<string, string> = {
       donationId,
-      userId: session.user.id,
+      userId: session?.user?.id ?? donation.donorId,
     };
+    const customerEmail = session?.user?.email ?? donation.donor?.email ?? undefined;
     if (donation.subscriptionId) {
       metadata.subscriptionDbId = donation.subscriptionId;
     }
@@ -103,7 +110,7 @@ export async function POST(req: NextRequest) {
         subscription_data: {
           metadata,
         },
-        customer_email: session.user.email ?? undefined,
+        customer_email: customerEmail,
       });
     } else {
       // One-time payment mode
@@ -125,7 +132,7 @@ export async function POST(req: NextRequest) {
         success_url: successUrl,
         cancel_url: cancelUrl,
         metadata,
-        customer_email: session.user.email ?? undefined,
+        customer_email: customerEmail,
       });
     }
 

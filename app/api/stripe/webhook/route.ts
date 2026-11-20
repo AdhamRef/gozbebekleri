@@ -460,9 +460,13 @@ export async function POST(req: NextRequest) {
 
         const donation = await prisma.donation.findUnique({
           where: { id: donationId },
-          select: { paidAt: true, status: true },
+          select: { paidAt: true, status: true, providerErrorMessage: true },
         });
         if (!donation || donation.paidAt || donation.status === "FAILED") break;
+
+        // PayFor→Stripe fallback checkout: keep why PayFor declined, too.
+        const payforReason =
+          session.metadata?.payforFallback === "checkout" ? donation.providerErrorMessage : null;
 
         await prisma.donation.update({
           where: { id: donationId },
@@ -471,7 +475,7 @@ export async function POST(req: NextRequest) {
             provider: "STRIPE",
             providerOrderId: session.id,
             providerTxnResult: "Failed",
-            providerErrorMessage: event.type,
+            providerErrorMessage: payforReason ? `PayFor: ${payforReason} | Stripe: ${event.type}` : event.type,
             providerRaw: session as never,
           },
         });
