@@ -5,6 +5,7 @@ import type { Locale } from "@/lib/seo";
 import { Suspense } from "react";
 import Navbar from "@/components/Navbar";
 import CartReminder from "@/components/CartReminder";
+import DonationPauseBanner from "@/components/minbar/shell/DonationPauseBanner";
 import { CurrencyFromUrlSync } from "@/components/CurrencyFromUrlSync";
 import IntlProviderClient from "./IntlProviderClient";
 import ar from "../../i18n/messages/ar.json";
@@ -97,6 +98,7 @@ export default async function Rootlayout({
               <PreferredLangSync />
               <Navbar />
               <main className="pt-16 2xl:pt-[104px]">
+                <DonationPauseBanner locale={locale} />
                 <ManagedBannerSlots locale={locale} slot="top" />
                 {children}
                 <ManagedBannerSlots locale={locale} slot="bottom" />

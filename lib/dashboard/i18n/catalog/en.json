@@ -6681,5 +6681,21 @@
  "القالب محفوظ بالفعل، وفتحناه هنا. راجع حالته في Meta قبل أي تعديل.": "This template is already saved and is now open here. Check its Meta status before editing.",
  "انقطع الاتصال قبل تأكيد الحفظ. أعدنا تحميل القالب؛ راجع حالته قبل إعادة المحاولة.": "The connection dropped before the save was confirmed. The template was reloaded; check its status before retrying.",
  "تم حفظ القالب، لكن رد Meta استغرق وقتًا أطول. راجع حالة كل لغة في قائمة القوالب.": "Template saved, but Meta took longer to respond. Check each language's status in the template list.",
- "تعذّر تأكيد الحفظ بسبب انقطاع الاتصال. تحقّق من قائمة القوالب قبل إعادة المحاولة حتى لا يتكرر الإرسال.": "The save could not be confirmed because the connection dropped. Check the template list before retrying so it is not submitted twice."
+ "تعذّر تأكيد الحفظ بسبب انقطاع الاتصال. تحقّق من قائمة القوالب قبل إعادة المحاولة حتى لا يتكرر الإرسال.": "The save could not be confirmed because the connection dropped. Check the template list before retrying so it is not submitted twice.",
+ "آخر تغيير {0} · بواسطة {1}": "Last changed {0} · by {1}",
+ "إعادة التشغيل الكامل": "Resume everything",
+ "إغلاق الموقع بالكامل": "Close the whole site",
+ "إغلاق الموقع: تظهر صفحة صيانة للزوار. تبقى لوحة التحكم وتسجيل الدخول وردود البنوك تعمل.": "Close the site: visitors see a maintenance page. The dashboard, sign-in and bank callbacks keep working.",
+ "إيقاف التبرعات": "Pause donations",
+ "إيقاف التبرعات: الموقع يبقى ظاهراً، ويتوقف بدء أي دفع جديد، ويظهر للزوار شريط بأن نظام التبرع قيد التحسين. الدفعات التي بدأت عند البنك تكتمل وتُسجَّل.": "Pause donations: the site stays visible, no new payment can start, and visitors see a notice that the donation system is being improved. Payments already at the bank complete and are recorded.",
+ "التبرعات متوقفة · الموقع يعمل": "Donations paused · the site is up",
+ "الموقع مغلق بالكامل (وضع الطوارئ)": "The site is fully closed (emergency mode)",
+ "الموقع يعمل بشكل طبيعي": "The site is running normally",
+ "تأكيد": "Confirm",
+ "تعذر تحميل حالة الموقع": "Could not load the site status",
+ "تعذر تغيير حالة الموقع": "Could not change the site status",
+ "تم تطبيق التغيير. قد يستغرق حتى 5 ثوانٍ.": "Change applied. It can take up to 5 seconds.",
+ "حالة الموقع": "Site status",
+ "للتأكيد اكتب الكلمة: {0}": "To confirm, type the word: {0}",
+ "هل تريد إعادة تشغيل الموقع والتبرعات للجميع؟": "Reopen the site and donations for everyone?"
 }
