@@ -40,7 +40,7 @@ const log = (entry: Record<string, unknown>) => raw({ insert: LOG, documents: [{
 
 /** The site's TLS certificate expiry, read from the live site (cached 12 h; null when unreadable). */
 let sslCache: { until: number; date: string | null } | null = null;
-export async function siteCertificateExpiry(host = "minberiaksa.org"): Promise<string | null> {
+export async function siteCertificateExpiry(host = "gozbebekleri.org"): Promise<string | null> {
   if (sslCache && sslCache.until > Date.now()) return sslCache.date;
   const date = await new Promise<string | null>((resolve) => {
     const socket = tls.connect({ host, port: 443, servername: host, timeout: 5000 }, () => {
