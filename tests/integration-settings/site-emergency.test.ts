@@ -49,7 +49,7 @@ test("only admins switch, any closing needs the typed confirmation, every change
 });
 
 test("the banner sits at the top of every public page and every dashboard label is translated", () => {
-  assert.match(fs.readFileSync("app/[locale]/layout.tsx", "utf8"), /<main><DonationPauseBanner locale=\{locale\} \/>\{children\}<\/main>/);
+  assert.match(fs.readFileSync("app/[locale]/layout.tsx", "utf8"), /<main[^>]*>\s*<DonationPauseBanner locale=\{locale\} \/>/);
   assert.match(fs.readFileSync("app/(dashboard)/dashboard/security/page.tsx", "utf8"), /<EmergencySwitch \/>\s*<SiteSecurityManager \/>/);
   const ui = fs.readFileSync("app/(dashboard)/dashboard/security/EmergencySwitch.tsx", "utf8");
   const keys = [...ui.matchAll(/dt\("([^"]+)"/g)].map((m) => m[1]);

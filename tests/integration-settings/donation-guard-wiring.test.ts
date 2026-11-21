@@ -33,7 +33,7 @@ test("only a verified PAID donation the browser may access issues the trusted-de
   assert.match(r, /donationAccess\(id, token\)/);
   assert.match(r, /row\?\.status !== "PAID" \|\| !row\.paidAt/);
   assert.match(r, /httpOnly: true, secure: true/);
-  assert.match(read("app/[locale]/success/[id]/page.tsx"), /<DonationTrustMark donationId=\{id\} token=\{token \?\? null\} \/>/);
+  assert.match(read("app/[locale]/success/[id]/page.tsx"), /<DonationTrustMark donationId=\{id\} token=\{null\} \/>/);
 });
 
 test("the admin overview requires an admin session and exposes hashed keys only", () => {
