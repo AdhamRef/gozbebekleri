@@ -6751,5 +6751,22 @@
  "يتجدد خلال {0} يوم": "Renews in {0} days",
  "تعذر الحفظ": "Could not save",
  "تصنيفات المتبرعين": "Donor categories",
- "الأمان وسجل الوصول": "Security and access log"
+ "الأمان وسجل الوصول": "Security and access log",
+ "يجب أن يحتوي كل قالب تسويقي جديد على زر واضح لإيقاف الرسائل.": "Each new marketing template must include a clear button to stop messages.",
+ "أكمل نص كل لغة مضافة قبل الحفظ": "Complete the text for each added language before saving",
+ "أُعدت نسخة بروابط اللغات الصحيحة للمراجعة. لم تُرسل إلى Meta بعد.": "A copy with localized links is ready for review. It has not been sent to Meta.",
+ "أضف زر رابط لصفحة تبرع على الموقع أولًا؛ لم يتم تغيير القالب.": "Add a button linking to a donation page on this site first. The template was not changed.",
+ "أُعدت نسخة مستقلة للمراجعة: {0} رابط تبرع بتتبع الحملة، و{1} رابط بقي كما هو. لم تُحفظ أو تُرسل إلى Meta بعد.": "A separate copy is ready for review: {0} campaign-tracked donation links; {1} links unchanged. It has not been saved or submitted to Meta.",
+ "قياس إيرادات الحملات": "Campaign revenue tracking",
+ "جهّز نسخة مستقلة بأزرار تبرع تحمل معرّف كل حملة تلقائيًا. تبقى النسخة الأصلية والحملات السابقة كما هي. راجع كل لغة ثم احفظ النسخة وأرسلها إلى Meta للاعتماد قبل اختيارها في حملة جديدة.": "Prepare a separate copy with donation buttons that automatically carry each campaign ID. The original template and previous campaigns stay intact. Review every language, then save and submit the copy to Meta for approval before selecting it in a new campaign.",
+ "إعداد نسخة بتتبع إيرادات الحملات": "Prepare a copy with campaign revenue tracking",
+ "روابط إعادة محاولة التبرع لا تطابق لغة بعض النسخ المعتمدة. يلزم اعتماد نسخة مصححة لدى Meta.": "Retry links use the wrong language in some approved variants. A corrected version needs Meta approval.",
+ "إنشاء نسخة بروابط مصححة للمراجعة": "Create a corrected copy for review",
+ "القوالب التسويقية المعتمدة سابقًا لا يتغير محتواها. أنشئ قالبًا جديدًا وأرسله إلى Meta لاعتماد زر إيقاف الرسائل.": "Previously approved marketing templates are not changed. Create a new template and submit it to Meta to approve the stop button.",
+ "اختياري · خاص باللغة الحالية": "Optional · for the current language only",
+ "رأس الرسالة والوسائط": "Message header and media",
+ "اكتمال بيانات التتبع: ": "Tracking data completeness: ",
+ "مصدر الاشتراك الأصلي": "Original subscription source",
+ "تقديم": "Move earlier",
+ "تأخير": "Move later"
 }
