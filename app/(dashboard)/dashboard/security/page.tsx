@@ -1,8 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { redirect } from "next/navigation";
-import SiteSecurityManager from "./SiteSecurityManager";
-import EmergencySwitch from "./EmergencySwitch";
+import { SiteSecurityManager, EmergencySwitch } from "./ClientOnly"; // DonorGatewayOverrides (#242) is not ported
 export const dynamic = "force-dynamic";
 export default async function SecurityPage() {
   const session = await getServerSession(authOptions);
