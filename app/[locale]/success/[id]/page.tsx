@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
+import DonationTrustMark from "@/components/minbar/success/DonationTrustMark";
 import { useRouter } from '@/i18n/routing';
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
 import { useTranslations } from 'next-intl';
@@ -351,6 +352,7 @@ const DonationSuccessPage = () => {
       className="min-h-screen bg-gray-50"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
+      {id ? <DonationTrustMark donationId={id} token={null} /> : null}
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
         {/* Hero block */}
         <motion.section
