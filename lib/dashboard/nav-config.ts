@@ -118,6 +118,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
   {
     group: "الإدارة",
     items: [
+      { key: "siteContent", get title() { return dt("معرض لقطات من الميدان"); }, href: "/dashboard/gallery", icon: "images", adminOnly: true, keywords: ["gallery", "photos", "images", "field", "email", "معرض", "صور", "لقطات"] },
       { key: "team", get title() { return dt("الفريق"); }, href: "/dashboard/users/team", icon: "userCog", keywords: ["team", "staff", "permissions", "صلاحيات"] },
       { key: "logs", get title() { return dt("الأمان وسجل الوصول"); }, href: "/dashboard/security", icon: "shield", adminOnly: true, keywords: ["security", "ip", "country", "block", "حظر", "أمان"] },
       { key: "generalSettings", title: "الإعدادات", href: "/dashboard/general/payment-gateways", icon: "settings", keywords: ["settings", "payment", "gateways", "stripe"] },
