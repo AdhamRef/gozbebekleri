@@ -6673,5 +6673,13 @@
  "تعذّر تحميل التقرير": "Rapor yüklenemedi",
  "العودة إلى الحملات": "Kampanyalara dön",
  "نوع القالب لا يطابق هذا الاستخدام.": "Şablon türü bu kullanıma uygun değil.",
- "مرتبط بحدث تلقائي؛ أزل الارتباط لتغيير النوع.": "Otomatik bir olaya bağlı. Türü değiştirmeden önce bağlantıyı kaldırın."
+ "مرتبط بحدث تلقائي؛ أزل الارتباط لتغيير النوع.": "Otomatik bir olaya bağlı. Türü değiştirmeden önce bağlantıyı kaldırın.",
+ "حملة داخلية": "Dahili kampanya",
+ "القناة: ": "Kanal: ",
+ "الحملة: ": "Kampanya: ",
+ "نسخ بصيغة مُرمَّزة": "Kodlanmış bağlantıyı kopyala",
+ "القالب محفوظ بالفعل، وفتحناه هنا. راجع حالته في Meta قبل أي تعديل.": "Bu şablon zaten kayıtlı ve burada açıldı. Düzenlemeden önce Meta durumunu kontrol edin.",
+ "انقطع الاتصال قبل تأكيد الحفظ. أعدنا تحميل القالب؛ راجع حالته قبل إعادة المحاولة.": "Kayıt onaylanmadan bağlantı kesildi. Şablon yeniden yüklendi; tekrar denemeden önce durumunu kontrol edin.",
+ "تم حفظ القالب، لكن رد Meta استغرق وقتًا أطول. راجع حالة كل لغة في قائمة القوالب.": "Şablon kaydedildi ancak Meta'nın yanıtı uzun sürdü. Her dilin durumunu şablon listesinden kontrol edin.",
+ "تعذّر تأكيد الحفظ بسبب انقطاع الاتصال. تحقّق من قائمة القوالب قبل إعادة المحاولة حتى لا يتكرر الإرسال.": "Bağlantı kesildiği için kayıt doğrulanamadı. İki kez gönderilmemesi için tekrar denemeden önce şablon listesini kontrol edin."
 }
