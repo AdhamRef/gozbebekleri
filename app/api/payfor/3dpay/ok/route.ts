@@ -1,4 +1,5 @@
 import { after, NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 // Donate (success) CAPI now fires server-side from `dispatchDonationPaid`
 // the moment the donation flips to PAID — that's the only path that
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
           where: { id: donation.id },
           data: {
             providerErrorMessage: PAYFOR_UNVERIFIED_APPROVAL,
-            providerRaw: raw as any,
+            providerRaw: raw as Prisma.InputJsonValue,
           },
         });
         return { ok: false as const, reason: "unverified" as const };
