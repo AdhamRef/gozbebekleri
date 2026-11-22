@@ -179,11 +179,12 @@ function DashboardContent({
     let cancelled = false;
     const run = async () => {
       try {
-        const res = await fetch("/api/dashboard/communication/inbox/summary", { cache: "no-store" });
+        const res = await fetch('/api/dashboard/communication/inbox/conversations?countsOnly=1', { cache: 'no-store', signal: AbortSignal.timeout(20000) });
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && data.ok !== false && Number.isFinite(data.unread)) setWhatsappInboxCount(Math.max(0, data.unread));
-      } catch { /* Retain the last successful count. */ }
+        const count = Number(data?.counts?.all);
+        if (!cancelled && Number.isFinite(count)) setWhatsappInboxCount(Math.max(0, count));
+      } catch { /* Retain the last confirmed count during transient failures. */ }
     };
     void run();
     const timer = setInterval(run, 30000);
