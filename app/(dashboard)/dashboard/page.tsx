@@ -345,6 +345,7 @@ export default function DashboardPage() {
     "all" | "ar" | "en" | "fr" | "tr" | "id" | "pt" | "es" | "de" | "__unset"
   >("all");
   const [donationCountryFilter, setDonationCountryFilter] = useState<string>("all");
+  const [donationSourceFilter, setDonationSourceFilter] = useState("all");
   const [countryOptions, setCountryOptions] = useState<{ code: string; count: number }[]>([]);
   const [countryUnsetCount, setCountryUnsetCount] = useState(0);
 
@@ -496,6 +497,7 @@ export default function DashboardPage() {
       if (showFailed) params.set("showFailed", "true");
       if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
       if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
+      if (donationSourceFilter !== "all") params.set("source", donationSourceFilter);
       const response = await axios.get(`/api/admin/donations/chart?${params}`);
       setChartData(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
@@ -505,7 +507,7 @@ export default function DashboardPage() {
     } finally {
       setChartLoading(false);
     }
-  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed, donationLocaleFilter, donationCountryFilter]);
+  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed, donationLocaleFilter, donationCountryFilter, donationSourceFilter]);
 
   useEffect(() => {
     fetchChartData();
@@ -565,6 +567,7 @@ export default function DashboardPage() {
         if (donationsTypeFilter !== "all") params.set("donationType", donationsTypeFilter);
         if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
         if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
+        if (donationSourceFilter !== "all") params.set("source", donationSourceFilter);
         if (donationsSearch) params.set("search", donationsSearch);
         const res = await fetch(`/api/donations?${params}`);
         const data = await res.json();
@@ -596,6 +599,7 @@ export default function DashboardPage() {
       donationsTypeFilter,
       donationLocaleFilter,
       donationCountryFilter,
+      donationSourceFilter,
       donationsSearch,
     ]
   );
@@ -605,7 +609,7 @@ export default function DashboardPage() {
     if (loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationsTypeFilter, donationLocaleFilter, donationCountryFilter, donationsSearch, fetchDonations]);
+  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationsTypeFilter, donationLocaleFilter, donationCountryFilter, donationSourceFilter, donationsSearch, fetchDonations]);
 
   const loadMoreDonations = () => {
     const next = donationsPage + 1;
@@ -1809,6 +1813,31 @@ export default function DashboardPage() {
         <SelectItem value="bar" className="text-xs">أعمدة</SelectItem>
         <SelectItem value="line" className="text-xs">خط</SelectItem>
         <SelectItem value="area" className="text-xs">منطقة</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Donation source (classified attribution, Minber #260) */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-semibold text-slate-600">
+      مصدر التبرع
+    </label>
+    <Select value={donationSourceFilter} onValueChange={setDonationSourceFilter}>
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
+        <SelectValue placeholder="كل المصادر" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">كل المصادر</SelectItem>
+        <SelectItem value="facebook" className="text-xs">فيسبوك</SelectItem>
+        <SelectItem value="instagram" className="text-xs">إنستغرام</SelectItem>
+        <SelectItem value="whatsapp" className="text-xs">واتساب</SelectItem>
+        <SelectItem value="email" className="text-xs">البريد الإلكتروني</SelectItem>
+        <SelectItem value="google_ads" className="text-xs">إعلانات Google</SelectItem>
+        <SelectItem value="google_search" className="text-xs">بحث Google</SelectItem>
+        <SelectItem value="tiktok" className="text-xs">تيك توك</SelectItem>
+        <SelectItem value="direct" className="text-xs">مباشر</SelectItem>
+        <SelectItem value="other" className="text-xs">أخرى</SelectItem>
+        <SelectItem value="unknown" className="text-xs">غير معروف</SelectItem>
       </SelectContent>
     </Select>
   </div>

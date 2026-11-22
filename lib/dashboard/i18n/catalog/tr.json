@@ -6787,5 +6787,11 @@
  "نافذة الرد مغلقة": "Yanıt penceresi kapalı",
  "نافذة الرد مفتوحة: متبقٍّ {0}": "Yanıt penceresi açık: {0} kaldı",
  "هذا المتبرع طلب عدم التواصل.": "Bu bağışçı iletişim kurulmamasını istedi.",
- "غير المقروءة": "Okunmamış"
+ "غير المقروءة": "Okunmamış",
+ "كل المصادر": "Tüm kaynaklar",
+ "فيسبوك": "Facebook",
+ "إنستغرام": "Instagram",
+ "إعلانات Google": "Google Ads",
+ "بحث Google": "Google Arama",
+ "تيك توك": "TikTok"
 }
