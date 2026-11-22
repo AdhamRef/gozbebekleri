@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-const files = ["platform-connections/communication/_components/IntegrationProviderCards.tsx", "security/EmergencySwitch.tsx", "security/SiteSecurityManager.tsx", "security/DonorGatewayOverrides.tsx"].map((f) => `app/(dashboard)/dashboard/${f}`);
+// Gözbebekleri: security/DonorGatewayOverrides.tsx comes with #242, which was not ported.
+const files = ["platform-connections/communication/_components/IntegrationProviderCards.tsx", "security/EmergencySwitch.tsx", "security/SiteSecurityManager.tsx"].map((f) => `app/(dashboard)/dashboard/${f}`);
 test("dashboard dates format with a fixed time zone, so the server and the browser draw the same text (React #418)", () => {
   for (const f of files) {
     const s = fs.readFileSync(f, "utf8");
