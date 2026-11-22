@@ -9,7 +9,8 @@ import { galleryCaption, galleryHiddenOn, galleryTexts, galleryVariant, type Pub
 export default function FieldGallery({ locale }: { locale: string }) {
   const pathname = usePathname() ?? "";
   const rtl = locale.startsWith("ar");
-  const route = routeForPathname(pathname);
+  // Gözbebekleri: this repo's routeForPathname has no "home" (only project pages), so the bare locale path is the home page.
+  const route = /^\/[a-z]{2}\/?$/i.test(pathname) ? "home" : routeForPathname(pathname);
   const hidden = galleryHiddenOn(pathname) || (route !== "home" && route !== "projectDetail");
   const row = useRef<HTMLDivElement>(null);
   const slide = (dir: 1 | -1) => { const el = row.current; if (el) el.scrollBy({ left: dir * (rtl ? -1 : 1) * el.clientWidth * 0.85, behavior: "smooth" }); };
