@@ -7090,5 +7090,7 @@
  "مسموح": "Allowed",
  "إعداد حظر هذا العنوان": "Prepare a block for this address",
  "لا توجد سجلات مطابقة بعد. تظهر الزيارات الجديدة بعد تفعيل النسخة.": "No matching records yet. New visits appear after this version is deployed.",
- "فحص صحة الاتصالات": "Check connection health"
+ "فحص صحة الاتصالات": "Check connection health",
+ "أدوات المحادثة": "Conversation tools",
+ "إرفاق": "Attach"
 }
