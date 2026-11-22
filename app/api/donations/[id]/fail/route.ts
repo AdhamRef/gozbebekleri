@@ -2,6 +2,7 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dispatchEvent } from "@/lib/events/dispatch";
 import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
+import { authorizeDonationAccess } from "@/lib/certificates/http";
 
 /**
  * Mark a donation as FAILED.
@@ -20,6 +21,9 @@ export async function PATCH(
   if (!id) {
     return NextResponse.json({ error: "Missing donation id" }, { status: 400 });
   }
+  // Only the donor (their guest token or their session) or staff may report their payment failed (owner, 2026-11-18).
+  const denied = await authorizeDonationAccess(id, req);
+  if (denied) return denied;
 
   let reason = "client_reported_failure";
   try {

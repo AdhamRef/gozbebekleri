@@ -13,6 +13,7 @@ import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversio
 import { dispatchDonationPaid } from "@/lib/events/dispatch";
 import { discardFallbackCard } from "@/lib/payments/fallback-card";
 import { handlePayForFailure } from "@/lib/payments/payfor-stripe-fallback";
+import { PAYFOR_UNVERIFIED_APPROVAL, verifyPayForRequestEcho, verifyPayForResponseHash } from "@/lib/payfor";
 
 export async function POST(req: NextRequest) {
   const origin = new URL(req.url).origin;
@@ -51,6 +52,16 @@ export async function POST(req: NextRequest) {
       // Idempotency: if already confirmed by a prior callback, just redirect to success
       if (donation.paidAt !== null) return { ok: true as const };
 
+      /* Nothing changes without proof the callback is genuine and about this donation: the bank's
+         signature, or our own request signature echoed back (3D-stage failures carry only that).
+         A forged POST is ignored and the donor simply sees the failure page (owner, 2026-11-18). */
+      const genuine = (orderId === donation.id || (!!donation.providerOrderId && orderId === donation.providerOrderId))
+        && (verifyPayForResponseHash(raw, process.env.PAYFOR_MERCHANT_PASS) || verifyPayForRequestEcho(raw, process.env.PAYFOR_MERCHANT_PASS));
+      if (!genuine) {
+        console.error("[PayFor OK] callback not authenticated; donation left unchanged", { donationId: donation.id, procReturnCode });
+        return { ok: false as const, reason: "unverified" as const };
+      }
+
       // Basic linkage check
       if (donation.providerOrderId && orderId && donation.providerOrderId !== orderId) {
         await tx.donation.update({
@@ -87,6 +98,22 @@ export async function POST(req: NextRequest) {
           },
         });
         return { ok: false as const, reason: "failed" as const, errorMessage: errorMessage || "Payment failed" };
+      }
+
+      /* An approval only counts when the bank signed it. A response that says
+         "00" but fails the hash is not proof of payment: the donation stays
+         unconfirmed (never FAILED, so a genuine charge can still be reconciled
+         by hand) and the response is kept for that check. (Minber, with #253.) */
+      if (!verifyPayForResponseHash(raw, process.env.PAYFOR_MERCHANT_PASS)) {
+        console.error("[PayFor OK] ResponseHash did not verify; donation left unconfirmed", { donationId: donation.id, procReturnCode });
+        await tx.donation.update({
+          where: { id: donation.id },
+          data: {
+            providerErrorMessage: PAYFOR_UNVERIFIED_APPROVAL,
+            providerRaw: raw as any,
+          },
+        });
+        return { ok: false as const, reason: "unverified" as const };
       }
 
       await tx.donation.update({

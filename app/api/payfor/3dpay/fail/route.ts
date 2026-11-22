@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handlePayForFailure } from "@/lib/payments/payfor-stripe-fallback";
+import { verifyPayForRequestEcho, verifyPayForResponseHash } from "@/lib/payfor";
 
 export async function POST(req: NextRequest) {
   const origin = new URL(req.url).origin;
@@ -32,6 +33,15 @@ export async function POST(req: NextRequest) {
     }
     if (donation.paidAt !== null) {
       return NextResponse.redirect(new URL(`/${locale}/success/${donationId}`, origin));
+    }
+
+    /* Only a genuine callback about this donation's order may change it or start the Stripe fallback:
+       the bank's signature, or our own request signature echoed back (Minber #253, 2026-11-18). */
+    const genuine = (orderId === donationId || (!!donation.providerOrderId && orderId === donation.providerOrderId))
+      && (verifyPayForResponseHash(raw, process.env.PAYFOR_MERCHANT_PASS) || verifyPayForRequestEcho(raw, process.env.PAYFOR_MERCHANT_PASS));
+    if (!genuine) {
+      console.error("[PayFor FAIL] callback not authenticated; donation left unchanged", { donationId });
+      return NextResponse.redirect(new URL(`/${locale}/donation-failed?donationId=${encodeURIComponent(donationId)}`, origin));
     }
 
     // Record PayFor's answer but do NOT mark FAILED yet — the donation is retried
