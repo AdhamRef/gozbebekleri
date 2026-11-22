@@ -1,4 +1,5 @@
 import { donationSourceWhere } from "@/lib/dashboard/donation-source-filter";
+import { donationCampaignWhere, donationCategoryOr, donationCountryFilterWhere, donationLocaleFilterWhere } from "@/lib/dashboard/donation-campaign-filter";
 /**
  * GET /api/admin/donations/export
  *
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     const baseWhere: Prisma.DonationWhereInput = {
-      ...(campaignId && campaignId !== "all" && { items: { some: { campaignId } } }),
+      ...(donationCampaignWhere(campaignId) ?? {}),
       ...(userId && userId !== "all" && { donorId: userId }),
       ...(referralId && referralId !== "all" && { referralId }),
       ...(subscriptionOnly && { subscriptionId: { not: null } }),
@@ -79,30 +80,18 @@ export async function GET(request: NextRequest) {
       ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
       ...(status && ["PAID", "FAILED"].includes(status) && { status: status as "PAID" | "FAILED" }),
     };
-    if (categoryId && categoryId !== "all") {
-      baseWhere.OR = [
-        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
-        { categoryItems: { some: { categoryId } } },
-      ];
+    const byCategory = donationCategoryOr(categoryId);
+    if (byCategory) {
+      baseWhere.OR = byCategory as Prisma.DonationWhereInput[];
     }
 
     const filters: Prisma.DonationWhereInput[] = [baseWhere];
     const sourceFilter = donationSourceWhere(sp.get("source"));
     if (sourceFilter) filters.push(sourceFilter);
-    if (locale && locale !== "all") {
-      filters.push(
-        locale === "__unset"
-          ? { OR: [{ locale: null }, { locale: "" }] }
-          : { locale }
-      );
-    }
-    if (country && country !== "all") {
-      filters.push(
-        country === "__unset"
-          ? { OR: [{ donorCountryCode: null }, { donorCountryCode: "" }] }
-          : { donorCountryCode: country.toUpperCase() }
-      );
-    }
+    const localeFilter = donationLocaleFilterWhere(locale);
+    if (localeFilter) filters.push(localeFilter as Prisma.DonationWhereInput);
+    const countryFilter = donationCountryFilterWhere(country);
+    if (countryFilter) filters.push(countryFilter as Prisma.DonationWhereInput);
     if (donationType === "ONE_TIME") {
       filters.push({ OR: [{ subscriptionId: null }, { subscriptionId: { isSet: false } }] });
     }

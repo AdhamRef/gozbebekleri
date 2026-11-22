@@ -12,6 +12,7 @@ import {
 } from '@/lib/dashboard/donation-usd-revenue';
 import { istanbulDateKeysToUtcRange } from '@/lib/admin/istanbul-calendar';
 import { donationFieldEmpty, donationWhereAll } from '@/lib/donations/mongo-null';
+import { campaignIdCondition, campaignInCategoriesWhere, donationCampaignWhere, donationCategoryOr, donationCountryFilterWhere, donationLocaleFilterWhere } from '@/lib/dashboard/donation-campaign-filter';
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -45,13 +46,12 @@ function buildDonationWhere(
 ) {
   const dateFilter = { createdAt: { gte: startDate, lte: endDate } };
   const base: Record<string, unknown> = { ...dateFilter };
-  if (campaignId && campaignId !== 'all') {
-    base.items = { some: { campaignId } };
-  } else if (categoryId && categoryId !== 'all') {
-    base.OR = [
-      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
-      { categoryItems: { some: { categoryId } } },
-    ];
+  const byCampaign = donationCampaignWhere(campaignId);
+  const byCategory = donationCategoryOr(categoryId);
+  if (byCampaign) {
+    base.items = byCampaign.items;
+  } else if (byCategory) {
+    base.OR = byCategory;
   }
   return base;
 }
@@ -59,33 +59,26 @@ function buildDonationWhere(
 /** Same filters as buildDonationWhere but no date — all-time إيرادات (donation amountUSD sum) */
 function buildDonationWhereAllTime(categoryId: string | null, campaignId: string | null) {
   const base: Record<string, unknown> = {};
-  if (campaignId && campaignId !== 'all') {
-    base.items = { some: { campaignId } };
-  } else if (categoryId && categoryId !== 'all') {
-    base.OR = [
-      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
-      { categoryItems: { some: { categoryId } } },
-    ];
+  const byCampaign = donationCampaignWhere(campaignId);
+  const byCategory = donationCategoryOr(categoryId);
+  if (byCampaign) {
+    base.items = byCampaign.items;
+  } else if (byCategory) {
+    base.OR = byCategory;
   }
   return base;
 }
 
 function mergeLocaleFilter(where: Record<string, unknown>, locale: string | null): Record<string, unknown> {
   if (!locale || locale === 'all') return where;
-  const lw =
-    locale === '__unset'
-      ? { OR: [{ locale: null }, { locale: '' }] }
-      : { locale };
-  return { AND: [where, lw] };
+  const lw = donationLocaleFilterWhere(locale);
+  return lw ? { AND: [where, lw] } : where;
 }
 
 function mergeCountryFilter(where: Record<string, unknown>, country: string | null): Record<string, unknown> {
   if (!country || country === 'all') return where;
-  const cw =
-    country === '__unset'
-      ? { OR: [{ donorCountryCode: null }, { donorCountryCode: '' }] }
-      : { donorCountryCode: country.toUpperCase() };
-  return { AND: [where, cw] };
+  const cw = donationCountryFilterWhere(country);
+  return cw ? { AND: [where, cw] } : where;
 }
 
 function mergeFilters(
@@ -112,9 +105,9 @@ function buildDonationItemWhere(
     ),
   };
   if (campaignId && campaignId !== 'all') {
-    base.campaignId = campaignId;
-  } else if (categoryId && categoryId !== 'all') {
-    base.campaign = { categoryIds: { has: categoryId } };
+    base.campaignId = campaignIdCondition(campaignId);
+  } else if (campaignInCategoriesWhere(categoryId)) {
+    base.campaign = campaignInCategoriesWhere(categoryId);
   }
   return base;
 }
@@ -134,7 +127,8 @@ function buildDonationCategoryItemWhere(
     ),
   };
   if (categoryId && categoryId !== 'all') {
-    base.categoryId = categoryId;
+    const ids = categoryId.split(",").map((v) => v.trim()).filter((v) => v && v !== 'all');
+    base.categoryId = ids.length > 1 ? { in: ids } : categoryId;
   }
   return base;
 }
@@ -192,13 +186,12 @@ export async function GET(request: NextRequest) {
     const thisMonthPaidWhere = donationWhereAll(thisMonthDonationWhere, PAID_DONATION_FILTER);
 
     const subscriptionWhere: Record<string, unknown> = { status: 'ACTIVE' };
-    if (campaignId && campaignId !== 'all') {
-      subscriptionWhere.items = { some: { campaignId } };
-    } else if (categoryId && categoryId !== 'all') {
-      subscriptionWhere.OR = [
-        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
-        { categoryItems: { some: { categoryId } } },
-      ];
+    const subByCampaign = donationCampaignWhere(campaignId);
+    const subByCategory = donationCategoryOr(categoryId);
+    if (subByCampaign) {
+      subscriptionWhere.items = subByCampaign.items;
+    } else if (subByCategory) {
+      subscriptionWhere.OR = subByCategory;
     }
     // ACTIVE subscription without any settled charge isn't really earning revenue —
     // exclude it from MRR / "التبرعات الشهرية الناشطة" so a failed-only sub doesn't inflate the totals.

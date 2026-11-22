@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { mergeDonationSourceFilter } from '@/lib/dashboard/donation-source-filter';
+import { donationCampaignWhere, donationCategoryOr, donationCountryFilterWhere, donationLocaleFilterWhere } from '@/lib/dashboard/donation-campaign-filter';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -13,20 +14,14 @@ import {
 
 function mergeLocaleFilter(where: Record<string, unknown>, locale: string | null): Record<string, unknown> {
   if (!locale || locale === 'all') return where;
-  const lw =
-    locale === '__unset'
-      ? { OR: [{ locale: null }, { locale: '' }] }
-      : { locale };
-  return { AND: [where, lw] };
+  const lw = donationLocaleFilterWhere(locale);
+  return lw ? { AND: [where, lw] } : where;
 }
 
 function mergeCountryFilter(where: Record<string, unknown>, country: string | null): Record<string, unknown> {
   if (!country || country === 'all') return where;
-  const cw =
-    country === '__unset'
-      ? { OR: [{ donorCountryCode: null }, { donorCountryCode: '' }] }
-      : { donorCountryCode: country.toUpperCase() };
-  return { AND: [where, cw] };
+  const cw = donationCountryFilterWhere(country);
+  return cw ? { AND: [where, cw] } : where;
 }
 
 export async function GET(request: NextRequest) {
@@ -71,17 +66,12 @@ export async function GET(request: NextRequest) {
       innerWhere.donorId = userId;
     }
 
-    if (campaignId && campaignId !== 'all') {
-      innerWhere.AND = [{ items: { some: { campaignId } } }];
-    } else if (categoryId && categoryId !== 'all') {
-      innerWhere.AND = [
-        {
-          OR: [
-            { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
-            { categoryItems: { some: { categoryId } } },
-          ],
-        },
-      ];
+    const byCampaign = donationCampaignWhere(campaignId);
+    const byCategory = donationCategoryOr(categoryId);
+    if (byCampaign) {
+      innerWhere.AND = [byCampaign];
+    } else if (byCategory) {
+      innerWhere.AND = [{ OR: byCategory }];
     }
 
     const baseWhere = mergeDonationSourceFilter(mergeCountryFilter(mergeLocaleFilter(innerWhere, locale), country), searchParams.get('source'));

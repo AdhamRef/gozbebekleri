@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { donationCampaignWhere, donationCategoryOr, donationCountryFilterWhere, donationLocaleFilterWhere } from "@/lib/dashboard/donation-campaign-filter";
 import { isValidLocale } from "@/lib/locales";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
     const countryFilter = isAdmin ? searchParams.get("country")?.trim() : null;
 
     const baseWhere: Record<string, unknown> = {
-      ...(campaignId && { items: { some: { campaignId } } }),
+      ...(campaignId && donationCampaignWhere(campaignId)),
       ...(userId && { donorId: userId }),
       ...(referralId && isAdmin && { referralId }),
       ...(subscriptionOnly && { subscriptionId: { not: null } }),
@@ -83,11 +84,9 @@ export async function GET(request: NextRequest) {
       ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
       ...(statusFilter && ["PAID", "FAILED"].includes(statusFilter) && { status: statusFilter }),
     };
-    if (categoryId && isAdmin) {
-      baseWhere.OR = [
-        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
-        { categoryItems: { some: { categoryId } } },
-      ];
+    const byCategory = isAdmin ? donationCategoryOr(categoryId) : null;
+    if (byCategory) {
+      baseWhere.OR = byCategory;
     }
 
     // Free-text donor search (name OR email), admin-only. Kept OUT of `baseWhere`
@@ -107,19 +106,9 @@ export async function GET(request: NextRequest) {
           }
         : null;
 
-    const localeWhere =
-      localeFilter && localeFilter !== "all"
-        ? localeFilter === "__unset"
-          ? { OR: [{ locale: null }, { locale: "" }] }
-          : { locale: localeFilter }
-        : null;
+    const localeWhere = donationLocaleFilterWhere(localeFilter);
 
-    const countryWhere =
-      countryFilter && countryFilter !== "all"
-        ? countryFilter === "__unset"
-          ? { OR: [{ donorCountryCode: null }, { donorCountryCode: "" }] }
-          : { donorCountryCode: countryFilter.toUpperCase() }
-        : null;
+    const countryWhere = donationCountryFilterWhere(countryFilter);
 
     // ONE_TIME means "no subscriptionId". MongoDB may store it as null or
     // omit the field entirely; cover both with isSet:false || null.

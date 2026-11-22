@@ -47,8 +47,8 @@ test("chart, list and export apply the source filter; the page offers it", () =>
   assert.match(fs.readFileSync("app/api/admin/donations/export/route.ts", "utf8"), /donationSourceWhere\(sp\.get\("source"\)\)/);
   const page = fs.readFileSync("app/(dashboard)/dashboard/page.tsx", "utf8");
   assert.equal((page.match(/params\.set\("source", donationSourceFilter\)/g) ?? []).length, 2, "chart and list requests");
-  assert.match(page, /<Select value=\{donationSourceFilter\} onValueChange=\{setDonationSourceFilter\}>/);
-  assert.match(page, /مصدر التبرع/);
+  // #282: the source picker takes several values at once.
+  assert.match(page, /<MultiPick label="مصدر التبرع" allLabel="كل المصادر" selected=\{pickList\(donationSourceFilter\)\}/);
 });
 
 test("the classification job is cron-protected and writes only sourceChannel", () => {
