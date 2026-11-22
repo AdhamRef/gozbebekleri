@@ -46,7 +46,7 @@ test("chart, list and export apply the source filter; the page offers it", () =>
   assert.match(fs.readFileSync("app/api/donations/route.ts", "utf8"), /donationTypeWhere, sourceWhere\]/);
   assert.match(fs.readFileSync("app/api/admin/donations/export/route.ts", "utf8"), /donationSourceWhere\(sp\.get\("source"\)\)/);
   const page = fs.readFileSync("app/(dashboard)/dashboard/page.tsx", "utf8");
-  assert.equal((page.match(/params\.set\("source", donationSourceFilter\)/g) ?? []).length, 2, "chart and list requests");
+  assert.equal((page.match(/params\.set\("source", donationSourceFilter\)/g) ?? []).length, 3, "chart, list and KPI (stats, #287) requests");
   // #282: the source picker takes several values at once.
   assert.match(page, /<MultiPick label="مصدر التبرع" allLabel="كل المصادر" selected=\{pickList\(donationSourceFilter\)\}/);
 });

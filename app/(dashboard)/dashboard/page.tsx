@@ -583,6 +583,8 @@ export default function DashboardPage() {
       if (selectedCampaign !== "all") params.set("campaignId", selectedCampaign);
       if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
       if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
+      // Minber #287: the KPIs honour the source filter like the chart and the list.
+      if (donationSourceFilter !== "all") params.set("source", donationSourceFilter);
       const response = await fetch(`/api/admin/stats?${params}`);
       const data = await response.json();
       if (!response.ok) {
@@ -597,7 +599,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [chartPeriod, dateFrom, dateTo, selectedCategory, selectedCampaign, donationLocaleFilter, donationCountryFilter]);
+  }, [chartPeriod, dateFrom, dateTo, selectedCategory, selectedCampaign, donationLocaleFilter, donationCountryFilter, donationSourceFilter]);
 
   useEffect(() => {
     fetchStats();
