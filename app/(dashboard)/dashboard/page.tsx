@@ -349,6 +349,60 @@ export default function DashboardPage() {
   >("all");
   const [donationCountryFilter, setDonationCountryFilter] = useState<string>("all");
   const [donationSourceFilter, setDonationSourceFilter] = useState("all");
+
+  // Saved filter sets and "campaign for this result" (owner, 2026-11-21).
+  type SavedView = { id: string; name: string; filters: Record<string, string>; shared: boolean; mine: boolean; ownerName: string | null };
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]), [activeViewId, setActiveViewId] = useState("");
+  const loadViews = useCallback(() => {
+    fetch("/api/admin/dashboard-views", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.views) setSavedViews(d.views as SavedView[]); }).catch(() => {});
+  }, []);
+  useEffect(() => { loadViews(); }, [loadViews]);
+  const currentFilters = (): Record<string, string> => ({ selectedCategory, selectedCampaign, donationSourceFilter, donationLocaleFilter, donationCountryFilter, donationsStatusFilter, donationsTypeFilter, chartPeriod, dateFrom, dateTo });
+  const applyView = (v: SavedView) => {
+    const f = v.filters;
+    if (f.selectedCategory) setSelectedCategory(f.selectedCategory);
+    if (f.selectedCampaign) setSelectedCampaign(f.selectedCampaign);
+    if (f.donationSourceFilter) setDonationSourceFilter(f.donationSourceFilter);
+    if (f.donationLocaleFilter) setDonationLocaleFilter(f.donationLocaleFilter as typeof donationLocaleFilter);
+    if (f.donationCountryFilter) setDonationCountryFilter(f.donationCountryFilter);
+    if (f.donationsStatusFilter) setDonationsStatusFilter(f.donationsStatusFilter as typeof donationsStatusFilter);
+    if (f.donationsTypeFilter) setDonationsTypeFilter(f.donationsTypeFilter as typeof donationsTypeFilter);
+    if (f.chartPeriod) setChartPeriod(f.chartPeriod as ChartPeriod);
+    setDateFrom(f.dateFrom ?? ""); setDateTo(f.dateTo ?? "");
+  };
+  const saveView = async () => {
+    const name = window.prompt("اسم العرض (مثلاً: متبرعو تركيا عبر فيسبوك)");
+    if (!name?.trim()) return;
+    const shared = window.confirm("مشاركة هذا العرض مع الفريق؟ (موافق = مشترك، إلغاء = لي فقط)");
+    await fetch("/api/admin/dashboard-views", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), filters: currentFilters(), shared }) }).catch(() => undefined);
+    loadViews();
+  };
+  const deleteView = async () => {
+    const v = savedViews.find((x) => x.id === activeViewId);
+    if (!v || !v.mine || !window.confirm(`حذف العرض «${v.name}»؟`)) return;
+    await fetch(`/api/admin/dashboard-views?id=${v.id}`, { method: "DELETE" }).catch(() => undefined);
+    setActiveViewId(""); loadViews();
+  };
+  /** Opens a new campaign whose smart audience carries the filters that exist on both sides; the rest is listed. */
+  const campaignForResult = () => {
+    const list = (v: string) => (v && v !== "all" ? v.split(",").filter((x) => x && x !== "__unset") : []);
+    const kept: string[] = [], dropped: string[] = [];
+    const filters: Record<string, unknown> = {};
+    const countries = list(donationCountryFilter).map((c) => c.toUpperCase()); if (countries.length) { filters.countries = countries; kept.push("الدولة"); }
+    const locales = list(donationLocaleFilter); if (locales.length) { filters.locales = locales; kept.push("اللغة"); }
+    const sources = list(donationSourceFilter).filter((x) => x !== "unknown"); if (sources.length) { filters.sourceChannels = sources; kept.push("مصدر التبرع"); }
+    let projects = list(selectedCampaign);
+    if (!projects.length && list(selectedCategory).length) { projects = campaigns.filter((c) => list(selectedCategory).some((cid) => (c.categoryIds ?? (c.categoryId ? [c.categoryId] : [])).includes(cid))).map((c) => c.id); if (projects.length) kept.push("الفئة (بمشاريعها)"); }
+    else if (projects.length) kept.push("المشروع");
+    if (projects.length) filters.projectIds = projects;
+    const days: Partial<Record<ChartPeriod, number>> = { day: 1, yesterday: 2, week: 7, month: 31, year: 366 };
+    const span = chartPeriod === "custom" && dateFrom ? Math.max(1, Math.ceil((Date.now() - new Date(dateFrom).getTime()) / 864e5)) : days[chartPeriod];
+    if (span) { filters.donatedWithinDays = span; kept.push(`تبرّع خلال آخر ${span} يوماً`); }
+    if (donationsTypeFilter !== "all") dropped.push("نوع التبرع");
+    if (donationsStatusFilter !== "all") dropped.push("حالة التبرع");
+    const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ filters, kept, dropped }))));
+    window.location.assign(`/dashboard/communication/campaigns/new?audience=${encodeURIComponent(payload)}`);
+  };
   const [countryOptions, setCountryOptions] = useState<{ code: string; count: number }[]>([]);
   const [countryUnsetCount, setCountryUnsetCount] = useState(0);
 
@@ -1666,6 +1720,18 @@ export default function DashboardPage() {
 
 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
 
+
+  {/* Saved views and campaign for this result */}
+  <div className="col-span-full flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-2 text-xs">
+    <select value={activeViewId} onChange={(e) => { setActiveViewId(e.target.value); const v = savedViews.find((x) => x.id === e.target.value); if (v) applyView(v); }} className="h-8 rounded border border-slate-200 bg-white px-2">
+      <option value="">العروض المحفوظة…</option>
+      {savedViews.map((v) => <option key={v.id} value={v.id}>{v.name}{v.shared ? " · مشترك" : ""}{!v.mine && v.ownerName ? ` (${v.ownerName})` : ""}</option>)}
+    </select>
+    <button type="button" onClick={() => void saveView()} className="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-100">💾 حفظ الفلاتر</button>
+    {savedViews.find((x) => x.id === activeViewId)?.mine ? <button type="button" onClick={() => void deleteView()} className="h-8 rounded px-2 text-slate-500 hover:text-red-600">حذف العرض</button> : null}
+    <span className="flex-1" />
+    <button type="button" onClick={campaignForResult} className="h-8 rounded bg-brand px-3 font-bold text-white hover:bg-brand/90">📣 حملة لمتبرعي هذه النتيجة</button>
+  </div>
 
   {/* Category — several at once (Minber #282) */}
   <MultiPick label="الفئة" allLabel="جميع الفئات" labelClassName="text-[11px] font-semibold text-slate-600" selected={pickList(selectedCategory)}
