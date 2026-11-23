@@ -6,7 +6,7 @@ import MicrosoftClarity from "@/components/MicrosoftClarity";
 import EngagementInstrumentation from "@/components/EngagementInstrumentation";
 import { Analytics } from "@vercel/analytics/next";
 import "./[locale]/globals.css";
-
+//locale
 const poppins = localFont({
   src: [
     { path: "./fonts/Poppins-Regular.woff2", weight: "400", style: "normal" },
