@@ -43,11 +43,16 @@ export type { EmailAttachmentInput };
  * wording as the header of the automatic e-mails. Other languages use the English form. A sender name set
  * explicitly (a campaign, for instance) always wins; with no language either, the configured name is used.
  */
+// Gozbebekleri: its own legal name in each enabled site language (i18n/messages/*.json associationName).
 const INSTITUTION_SENDER_NAMES: Record<string, string> = {
-  ar: "مؤسسة منبر الأقصى الدولية",
-  tr: "Uluslararası Minber-i Aksâ Derneği",
-  en: "Minbar al-Aqsa International Association",
-  fr: "Association internationale Minbar al-Aqsa",
+  ar: "جمعية قرة العيون للإغاثة والتكافل",
+  tr: "Gözbebekleri Yardımlaşma ve Dayanışma Derneği",
+  en: "Qurrat Al-Ayun Relief and Solidarity Association",
+  fr: "Association de secours et de solidarité Qurrat Al-Ayun",
+  id: "Asosiasi Bantuan dan Solidaritas Qurrat Al-Ayun",
+  pt: "Associação de Socorro e Solidariedade Qurrat Al-Ayun",
+  es: "Asociación de Socorro y Solidaridad Qurrat Al-Ayun",
+  de: "Qurrat Al-Ayun Hilfs- und Solidaritätsverein",
 };
 export function institutionSenderName(locale: string | null | undefined): string | null {
   const lang = (locale ?? "").trim().toLowerCase().split(/[-_]/)[0];

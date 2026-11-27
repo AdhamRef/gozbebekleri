@@ -12,12 +12,13 @@ vm.runInNewContext(js, { module: mod });
 const name = mod.exports.institutionSenderName;
 
 test("the sender is the institution's name in the message's language", () => {
-  assert.equal(name("ar"), "مؤسسة منبر الأقصى الدولية");
-  assert.equal(name("tr"), "Uluslararası Minber-i Aksâ Derneği");
-  assert.equal(name("en"), "Minbar al-Aqsa International Association");
-  assert.equal(name("fr"), "Association internationale Minbar al-Aqsa");
-  assert.equal(name("tr-TR"), "Uluslararası Minber-i Aksâ Derneği");
-  assert.equal(name("de"), "Minbar al-Aqsa International Association", "other languages: English form");
+  assert.equal(name("ar"), "جمعية قرة العيون للإغاثة والتكافل");
+  assert.equal(name("tr"), "Gözbebekleri Yardımlaşma ve Dayanışma Derneği");
+  assert.equal(name("en"), "Qurrat Al-Ayun Relief and Solidarity Association");
+  assert.equal(name("fr"), "Association de secours et de solidarité Qurrat Al-Ayun");
+  assert.equal(name("tr-TR"), "Gözbebekleri Yardımlaşma ve Dayanışma Derneği");
+  assert.equal(name("de"), "Qurrat Al-Ayun Hilfs- und Solidaritätsverein");
+  assert.equal(name("ja"), "Qurrat Al-Ayun Relief and Solidarity Association", "languages Gozbebekleri does not serve: English form");
 });
 
 test("no language keeps the configured sender; an explicit sender name always wins", () => {
