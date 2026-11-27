@@ -10,7 +10,9 @@ export default function FieldGallery({ locale }: { locale: string }) {
   const pathname = usePathname() ?? "";
   const rtl = locale.startsWith("ar");
   const route = routeForPathname(pathname);
-  const hidden = galleryHiddenOn(pathname) || (route !== "home" && route !== "projectDetail");
+  // Gozbebekleri's route map has no "home" entry: the locale root (/ar, /en, …) is the home page.
+  const isHome = route === "home" || /^\/[a-z]{2}\/?$/.test(pathname ?? "");
+  const hidden = galleryHiddenOn(pathname) || (!isHome && route !== "projectDetail");
   const row = useRef<HTMLDivElement>(null);
   const slide = (dir: 1 | -1) => { const el = row.current; if (el) el.scrollBy({ left: dir * (rtl ? -1 : 1) * el.clientWidth * 0.85, behavior: "smooth" }); };
   const [images, setImages] = useState<PublicGalleryImage[]>([]);
