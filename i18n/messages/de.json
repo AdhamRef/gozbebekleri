@@ -635,7 +635,7 @@
     "sslSecurePayment": "256-Bit-SSL-verschlüsselt · Sichere Zahlung",
     "stripeMinDonation": "Mindestspende: {amount} {currency}",
     "certificateNoteTitle": "Erhalte deine Spendenbescheinigung ✨",
-    "certificateNoteBody": "Gib deine echte E-Mail-Adresse an, damit wir dir die offizielle Spendenbescheinigung und Quittung der Stiftung zusenden können."
+    "certificateNoteBody": "Gib deine echte E-Mail-Adresse an, damit wir dir die offizielle Spendenbescheinigung und Quittung des Vereins zusenden können."
   },
   "DonationSuccess": {
     "unconfirmedTitle": "Die Zahlung ist noch nicht bestätigt",

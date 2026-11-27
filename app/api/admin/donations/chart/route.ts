@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mergeDonationSourceFilter } from '@/lib/dashboard/donation-source-filter';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const baseWhere = mergeCountryFilter(mergeLocaleFilter(innerWhere, locale), country);
+    const baseWhere = mergeDonationSourceFilter(mergeCountryFilter(mergeLocaleFilter(innerWhere, locale), country), searchParams.get('source'));
 
     // Always fetch both paid and failed donations
     const donations = await prisma.donation.findMany({
@@ -101,8 +102,8 @@ export async function GET(request: NextRequest) {
         currency: true,
         status: true,
         paidAt: true,
-        items: { select: { amount: true, amountUSD: true } },
-        categoryItems: { select: { amount: true, amountUSD: true } },
+        // items / categoryItems are not read below (donationRowUsdApprox uses amountUSD, amount, currency): loading them
+        // for every donation in the range cost two large relation queries (2026-11-20).
       },
     });
 

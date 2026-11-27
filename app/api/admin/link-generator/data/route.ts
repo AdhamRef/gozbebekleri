@@ -37,7 +37,8 @@ export async function GET() {
 
     const [campaigns, categories, posts, postCategories] = await Promise.all([
       prisma.campaign.findMany({
-        where: NOT_IMPACT_BACKING,
+        // Match the public sitemap: inactive and soft-deleted projects are not ad destinations (#233).
+        where: { AND: [NOT_IMPACT_BACKING, { isActive: true, OR: [{ isDeleted: false }, { isDeleted: { isSet: false } }] }] },
         select: {
           id: true,
           slug: true,
@@ -57,6 +58,7 @@ export async function GET() {
         orderBy: { name: "asc" },
       }),
       prisma.post.findMany({
+        where: { published: true },
         select: {
           id: true,
           slug: true,
@@ -89,6 +91,7 @@ export async function GET() {
         id: c.id,
         slug: c.slug ?? null,
         title: c.title,
+        published: true,
         supportedLocales: localesArr,
         slugByLocale: buildSlugByLocale(c.slug ?? null, c.translations, localesArr),
       };
