@@ -6,6 +6,7 @@ import MicrosoftClarity from "@/components/MicrosoftClarity";
 import EngagementInstrumentation from "@/components/EngagementInstrumentation";
 import { Analytics } from "@vercel/analytics/next";
 import "./[locale]/globals.css";
+import { InboxPermissionsBoundary } from "@/components/dashboard/InboxPermissionsBoundary";
 
 const poppins = localFont({
   src: [
@@ -311,7 +312,8 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         />
-        {children}
+        {/* Reload across the WhatsApp-inbox boundary: Permissions-Policy (microphone) belongs to the document (#261). */}
+        <InboxPermissionsBoundary>{children}</InboxPermissionsBoundary>
         <MicrosoftClarity />
         <Suspense fallback={null}>
           <EngagementInstrumentation />

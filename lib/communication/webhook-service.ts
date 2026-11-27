@@ -256,6 +256,18 @@ export async function processWhatsappEvents(events: NormalizedWebhookEvent[]): P
         const res = await markDeliveryStatus(delivery.id, event.status, patch);
         if (res.ok) summary.deliveryUpdates += 1;
         else summary.persistenceErrors += 1;
+        // Meta 131050: the recipient stopped our marketing inside WhatsApp itself — the same as pressing STOP
+        // (50 such numbers kept receiving campaigns, 2026-11-20). Recorded with the marker campaigns honour.
+        const recipient = (event as { recipient?: string | null }).recipient;
+        if (event.status === "FAILED" && /\b131050\b/.test(String(event.errorMessage ?? "")) && recipient) {
+          const phone = normalizePhoneE164(recipient) ?? recipient;
+          await Promise.resolve()
+            .then(() => prisma.donorCommunicationProfile.updateMany({
+              where: { phone: { in: phoneMatchVariants(phone) } },
+              data: { consentSource: "meta-whatsapp-inbound-opt-out", lastConsentAt: new Date() },
+            }))
+            .catch(() => { summary.persistenceErrors += 1; });
+        }
       }
       continue;
     }
@@ -335,6 +347,11 @@ export async function processWhatsappEvents(events: NormalizedWebhookEvent[]): P
     } else {
       summary.processed += 1;
       summary.inbound += 1;
+      // Inbox conversation layer (language tab, unread, ordering). Lazy and fail-safe: never blocks receiving.
+      const contact = normalizePhoneE164(event.from) ?? event.from;
+      if (contact) void import("./inbox-conversations")
+        .then((m) => m.touchInbound({ senderId, phone: contact, text: event.text ?? (event.messageType ? `[${event.messageType}]` : null), profileName: event.profileName ?? null, at: messageEventTime(event.timestamp) }))
+        .catch(() => undefined);
     }
 
     /*

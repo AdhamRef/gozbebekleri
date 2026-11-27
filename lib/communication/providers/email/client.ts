@@ -38,6 +38,28 @@ export type EmailSendInput = {
 
 export type { EmailAttachmentInput };
 
+/**
+ * The institution's name as the e-mail sender, in the message's language (owner, 2026-11-19): the same
+ * wording as the header of the automatic e-mails. Other languages use the English form. A sender name set
+ * explicitly (a campaign, for instance) always wins; with no language either, the configured name is used.
+ */
+// Gozbebekleri: its own legal name in each enabled site language (i18n/messages/*.json associationName).
+const INSTITUTION_SENDER_NAMES: Record<string, string> = {
+  ar: "جمعية قرة العيون للإغاثة والتكافل",
+  tr: "Gözbebekleri Yardımlaşma ve Dayanışma Derneği",
+  en: "Qurrat Al-Ayun Relief and Solidarity Association",
+  fr: "Association de secours et de solidarité Qurrat Al-Ayun",
+  id: "Asosiasi Bantuan dan Solidaritas Qurrat Al-Ayun",
+  pt: "Associação de Socorro e Solidariedade Qurrat Al-Ayun",
+  es: "Asociación de Socorro y Solidaridad Qurrat Al-Ayun",
+  de: "Qurrat Al-Ayun Hilfs- und Solidaritätsverein",
+};
+export function institutionSenderName(locale: string | null | undefined): string | null {
+  const lang = (locale ?? "").trim().toLowerCase().split(/[-_]/)[0];
+  if (!lang) return null;
+  return INSTITUTION_SENDER_NAMES[lang] ?? INSTITUTION_SENDER_NAMES.en;
+}
+
 export type EmailSendResult =
   | { ok: true; providerId: typeof EMAIL_PROVIDER_ID; providerMessageId: string | null; internalAccepted: boolean }
   | { ok: false; reason: string; detail?: string };
@@ -69,7 +91,8 @@ export async function sendEmailMessage(input: EmailSendInput, runtime?: ElasticE
     subject: input.subject,
     html,
     text: input.text,
-    senderName: input.senderName,
+    // Owner, 2026-11-20: the localized institution name is for automatic messages only, never marketing campaigns.
+    senderName: input.senderName?.trim() || (input.purpose === "MARKETING" ? null : institutionSenderName(input.locale)),
     senderEmail: input.senderEmail,
     replyTo: input.replyTo,
     channelName: input.channelName,

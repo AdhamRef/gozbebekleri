@@ -105,6 +105,20 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ["@usewaypoint/email-builder"],
   compiler: { removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false },
+  /* Voice notes need browser microphone permission on the protected WhatsApp inbox pages (Minber #120, #261).
+     Gozbebekleri sets no site-wide Permissions-Policy, so only these two page-specific policies are added. */
+  async headers() {
+    return [
+      {
+        source: "/dashboard/communication/inbox/:path*",
+        headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), browsing-topics=()" }],
+      },
+      {
+        source: "/dashboard/communication/conversations/:path*",
+        headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), browsing-topics=()" }],
+      },
+    ];
+  },
   async rewrites() {
     return [
       { source: "/api/admin/subscriptions/chart", destination: "/api/admin/subscriptions/overview/chart" },

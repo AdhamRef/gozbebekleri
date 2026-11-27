@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'rea
 import { localeDirection } from "@/lib/ported-systems/locales";
 import SessionProvider from '@/components/providers/SessionProvider';
 import { NextIntlClientProvider } from "next-intl";
-import { Toaster } from "react-hot-toast";
+import { Toaster, ToastBar, toast as hotToast } from "react-hot-toast";
 import { ConfettiProvider } from "@/components/providers/confetti-provider";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { CurrencyFromUrlSync } from "@/components/CurrencyFromUrlSync";
@@ -35,6 +35,8 @@ import { CommandPalette } from "./_shell/CommandPalette";
 import { DashboardAutoEnhancements } from "./_components/DashboardAutoEnhancements";
 import { ProjectEditorSectionsEnhancer } from "./_components/ProjectEditorSectionsEnhancer";
 import { ProjectLocaleSlugEditor } from "./_components/ProjectLocaleSlugEditor";
+import { dt } from "@/lib/dashboard/i18n";
+import { alertOnNewInboxMessages, inboxAlertsEnabled, setInboxTitleCount } from "@/lib/communication/inbox-alerts";
 
 const COLLAPSE_STORAGE_KEY = 'dashboard-nav-collapsed';
 const DEFAULT_COLLAPSED: Record<string, boolean> = {
@@ -177,18 +179,34 @@ function DashboardContent({
   useEffect(() => {
     if (!canUseWhatsappInbox) { setWhatsappInboxCount(0); return; }
     let cancelled = false;
+    let running = false;
+    let last: number | null = null;
     const run = async () => {
+      // With alerts on, keep checking from a background tab: that is when an alert matters most.
+      if (running || (document.hidden && !inboxAlertsEnabled())) return;
+      running = true;
       try {
-        const res = await fetch("/api/dashboard/communication/inbox/summary", { cache: "no-store" });
+        // The WhatsApp inbox is the conversations page (#261): count its unread conversations.
+        const res = await fetch("/api/dashboard/communication/inbox/conversations?countsOnly=1", { cache: "no-store", signal: AbortSignal.timeout(20000) });
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && data.ok !== false && Number.isFinite(data.unread)) setWhatsappInboxCount(Math.max(0, data.unread));
-      } catch { /* Retain the last successful count. */ }
+        const count = Number(data?.counts?.all);
+        if (!cancelled && Number.isFinite(count)) {
+          const next = Math.max(0, count);
+          alertOnNewInboxMessages(last, next, { title: dt("رسالة واتساب جديدة"), body: dt("لديك {0} محادثة غير مقروءة", [next]), href: "/dashboard/communication/conversations" });
+          last = next;
+          setWhatsappInboxCount(next);
+        }
+      } catch { /* Retain the last confirmed count during transient failures. */ }
+      finally { running = false; }
     };
     void run();
     const timer = setInterval(run, 30000);
     return () => { cancelled = true; clearInterval(timer); };
   }, [canUseWhatsappInbox]);
+
+  // The unread total also shows in the tab title, so it is visible with the dashboard in the background (#265).
+  useEffect(() => { setInboxTitleCount(whatsappInboxCount); }, [whatsappInboxCount]);
 
   const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
   const openSearch = useCallback(() => { setIsSidebarOpen(false); setIsSearchOpen(true); }, []);
@@ -279,9 +297,25 @@ export default function DashboardLayoutClient({
           </ViewUserProfileProvider>
           <ConfettiProvider />
           <Toaster position="top-center" toastOptions={{
-            style: { fontFamily: 'inherit', fontSize: '14px' },
+            style: { fontFamily: 'inherit', fontSize: '14px', whiteSpace: 'pre-line', maxWidth: 560 },
             success: { iconTheme: { primary: '#025EB8', secondary: '#fff' } },
-          }} />
+            // Problems stay until closed (owner, 2026-11-20): they used to vanish before they could be read.
+            error: { duration: Infinity },
+          }}>
+            {(t) => (
+              <ToastBar toast={t}>
+                {({ icon, message }) => (
+                  <>
+                    {icon}
+                    {message}
+                    {t.type !== 'loading' ? (
+                      <button type="button" onClick={() => hotToast.dismiss(t.id)} aria-label={dt("إغلاق")} className="ms-2 shrink-0 self-start rounded px-1.5 text-slate-500 hover:bg-slate-100">✕</button>
+                    ) : null}
+                  </>
+                )}
+              </ToastBar>
+            )}
+          </Toaster>
         </SessionProvider>
       </CurrencyProvider>
       <Analytics />

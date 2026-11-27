@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import * as React from "react";
 import axios from "axios";
@@ -45,6 +46,7 @@ import { useCurrency } from "@/context/CurrencyContext";
 import { cn } from "@/lib/utils";
 import { ACTION_PERMISSION_ROWS, DASHBOARD_PERMISSION_ROWS } from "@/lib/dashboard/nav-config";
 import type { UserProfileCardData } from "@/lib/dashboard/user-profile-card";
+import DonorContactStatus from "@/components/dashboard/DonorContactStatus";
 import { resolveUserCountry } from "@/lib/dashboard/resolve-user-country";
 import {
   GENDER_LABEL_AR,
@@ -452,6 +454,9 @@ export function ViewUserProfileDialog({
                 />
               </div>
 
+              {/* Per-channel communication state of this donor (#275). */}
+              {user.role === "DONOR" && <DonorContactStatus userId={user.id} />}
+
               {/* Two-column info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <SectionCard title="معلومات التواصل" icon={UserCircle}>
@@ -637,6 +642,14 @@ export function ViewUserProfileDialog({
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Open the donor's WhatsApp conversation (#274). */}
+                {canMessage && user.phone && (
+                  <Button asChild size="sm" variant="outline" className="h-8 gap-1.5">
+                    <Link href={`/dashboard/communication/conversations?phone=${encodeURIComponent(user.phone)}`} onClick={() => onOpenChange(false)}>
+                      <MessageCircle className="h-3.5 w-3.5" />محادثة واتساب
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   onClick={() => setSmartWhatsappOpen(true)}
