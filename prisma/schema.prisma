@@ -2676,3 +2676,14 @@ model SubscriptionServiceRequest {
   @@index([status, createdAt])
   @@index([donorId, subscriptionId, createdAt])
 }
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// Single-record settings collection for site-wide defaults. Read by clients
+/// (currently for team-support quick-pick amounts in the donation flow);
+/// writable only from the admin dashboard.
+model RecurringPageSettings {
+  id            String   @id @map("_id")
+  configuration Json
+  revision      String
+  updatedAt     DateTime @updatedAt
+}
