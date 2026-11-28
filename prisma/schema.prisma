@@ -2752,3 +2752,85 @@ model FaqTranslation {
   faqContent String?
 
 }
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// Short-lived results for long editor suggestions; content is applied only by the editor's save flow.
+model AiSuggestionTask {
+  id          String   @id @map("_id")
+  ownerId     String
+  permission  String
+  requestHash String
+  /// Null covers older tasks: require analytics permission conservatively on reads.
+  requiresAnalytics Boolean?
+  status      String   @default("QUEUED")
+  httpStatus  Int?
+  result      Json?
+  deadlineAt  DateTime
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([ownerId, status, deadlineAt], map: "content_editor_ownerId_status_deadlineAt")
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model EditorialJob {
+  priority Int @default(10)
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  key String @unique
+  kind String
+  status String @default("QUEUED")
+  locale String @default("ar")
+  sourceId String? @db.ObjectId
+  sourceRevision String?
+  targetRevision String?
+  fields Json?
+  result Json?
+  error String?
+  version String @default(uuid())
+  creationKey String @default(uuid())
+  resultContentId String? @db.ObjectId
+  attempts Int @default(0)
+  leaseToken String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, priority, createdAt])
+  @@index([sourceId, locale])
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model EditorialSettings {
+  leaseToken String?
+  leaseUntil DateTime?
+  id String @id @map("_id")
+  weeklyEnabled Boolean @default(true)
+  market String @default("")
+  updatedAt DateTime @updatedAt
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model ManagedPageSeo {
+  key String @id @map("_id")
+  overrides Json
+  version String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// Idempotent editor creation requests are committed with the content in one transaction.
+model ContentCreationRequest {
+  id String @id @map("_id")
+  kind String
+  contentId String @db.ObjectId
+  fingerprint String
+  createdAt DateTime @default(now())
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model ContentRouteReservation {
+  id String @id @map("_id")
+  kind String
+  contentId String @db.ObjectId
+  createdAt DateTime @default(now())
+}
