@@ -31,9 +31,8 @@ export function EditorialPlanner({ initialArticleId = "", embedded = false }: { 
   const [articleError, setArticleError] = useState(""), [articlesLoading, setArticlesLoading] = useState(false);
   const refreshGeneration = useRef(0);
   const [loading, setLoading] = useState(false);
-  const [reviewUploads, setReviewUploads] = useState(0);
+  const reviewUploads = 0; // Gozbebekleri's rich editor reports no upload progress, so nothing is ever pending.
   const [savedArticleId, setSavedArticleId] = useState("");
-  const trackReviewUpload = useCallback((uploading: boolean) => setReviewUploads(count => Math.max(0, count + (uploading ? 1 : -1))), []);
   const [reason, setReason] = useState("");
   const [retryReview, setRetryReview] = useState<Job | null>(null), [retryConfirmed, setRetryConfirmed] = useState(false);
   const [filter, setFilter] = useState(""), [cursor, setCursor] = useState<string | null>(null);

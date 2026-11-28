@@ -28,7 +28,8 @@ export const MANAGED_SEO_PAGES = [
   page("bankTransfer", "التحويل البنكي", "/bank-transfer"),
 ] as const;
 export function managedSeoPage(key: string) { return MANAGED_SEO_PAGES.find((entry) => entry.key === key); }
-export function managedPagePath(key: string, _locale: string) {
+export function managedPagePath(key: string, locale: string) {
+  void locale; // Gozbebekleri uses the same path in every language
   return managedSeoPage(key)?.path ?? "";
 }
 export const PAGE_SEO_FIELDS = [
