@@ -5,25 +5,32 @@ import { Loader2, CalendarRange } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { calendarDateLabel } from "@/lib/dashboard/calendar-layout";
+import { dashDir, getDashLocale, dt } from "@/lib/dashboard/i18n";
 
 export type DayOfMonthMode = "collected" | "expected";
 
 export interface DayOfMonthDetailFilters {
+  month?: string;
   categoryId?: string;
   campaignId?: string;
   userId?: string;
   referralId?: string;
+  /** Recurring cadence (DAILY | FRIDAY | MONTHLY) or "all". */
+  frequency?: string;
 }
+
+type PlanStatus = "ACTIVE" | "PAUSED" | "CANCELLED" | "PAYMENT_FAILED";
 
 interface DetailRow {
   id: string;
   subscriptionId: string | null;
-  status: "ACTIVE" | "PAUSED" | "CANCELLED" | null;
+  status: PlanStatus | null;
+  frequency?: "DAILY" | "FRIDAY" | "MONTHLY" | null;
   amount: number;
   amountUSD: number | null;
   currency: string;
@@ -31,6 +38,7 @@ interface DetailRow {
   nextBillingDate: string | null;
   lastBillingDate: string | null;
   paidAt: string | null;
+  scheduledAt?: string | null;
   donor: { id: string; name: string | null; email: string | null } | null;
   campaigns: { id: string; title: string }[];
   categories: { id: string; name: string }[];
@@ -46,22 +54,30 @@ type Props = {
   onClose: () => void;
 };
 
-const STATUS_LABEL: Record<"ACTIVE" | "PAUSED" | "CANCELLED", string> = {
-  ACTIVE: "نشط",
-  PAUSED: "موقوف",
-  CANCELLED: "ملغى",
+const STATUS_LABEL: Record<PlanStatus, string> = {
+  get ACTIVE() { return dt("نشط"); },
+  get PAUSED() { return dt("موقوف"); },
+  get CANCELLED() { return dt("ملغى"); },
+  get PAYMENT_FAILED() { return dt("تعذّر الخصم"); },
 };
 
-const STATUS_CLASS: Record<"ACTIVE" | "PAUSED" | "CANCELLED", string> = {
+const STATUS_CLASS: Record<PlanStatus, string> = {
   ACTIVE: "bg-green-100 text-green-700",
   PAUSED: "bg-amber-100 text-amber-700",
   CANCELLED: "bg-slate-100 text-slate-600",
+  PAYMENT_FAILED: "bg-red-100 text-red-700",
+};
+
+const FREQUENCY_LABEL: Record<"DAILY" | "FRIDAY" | "MONTHLY", string> = {
+  get DAILY() { return dt("يومي"); },
+  get FRIDAY() { return dt("تبرع كل جمعة"); },
+  get MONTHLY() { return dt("شهري"); },
 };
 
 /**
  * Date over time, matching the cell in the أحدث الدفعات الشهرية table so the two read
- * the same. Both parts are rendered in Europe/Istanbul — the timezone every other figure
- * on this page is bucketed by — and they share one locale so the digits don't switch
+ * the same. Both parts are rendered in Europe/Istanbul  the timezone every other figure
+ * on this page is bucketed by  and they share one locale so the digits don't switch
  * numeral systems halfway down the cell.
  */
 function formatDateTime(value: string | null): { date: string; time: string } | null {
@@ -102,15 +118,17 @@ export function DayOfMonthDetailsDialog({ day, mode, filters, formatMoney, onClo
     setError(null);
 
     const params = new URLSearchParams({ day: String(day), mode });
+    if (filters?.month) params.set("month", filters.month);
     if (filters?.categoryId && filters.categoryId !== "all") params.set("categoryId", filters.categoryId);
     if (filters?.campaignId && filters.campaignId !== "all") params.set("campaignId", filters.campaignId);
     if (filters?.userId && filters.userId !== "all") params.set("userId", filters.userId);
     if (filters?.referralId) params.set("referralId", filters.referralId);
+    if (filters?.frequency && filters.frequency !== "all") params.set("frequency", filters.frequency);
 
     fetch(`/api/admin/subscriptions/overview/day-of-month/details?${params}`)
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "تعذّر تحميل التفاصيل");
+        if (!res.ok) throw new Error(data?.error || dt("تعذّر تحميل التفاصيل"));
         return data;
       })
       .then((data) => {
@@ -128,32 +146,32 @@ export function DayOfMonthDetailsDialog({ day, mode, filters, formatMoney, onClo
     return () => {
       cancelled = true;
     };
-  }, [day, mode, filters?.categoryId, filters?.campaignId, filters?.userId, filters?.referralId]);
+  }, [day, mode, filters?.month, filters?.categoryId, filters?.campaignId, filters?.userId, filters?.referralId, filters?.frequency]);
 
   const isCollected = mode === "collected";
 
   return (
     <Dialog open={day != null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        dir="rtl"
+        dir={dashDir()}
         className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0"
       >
-        <DialogHeader className="px-5 py-4 border-b border-slate-100 text-right space-y-1">
+        <DialogHeader className="px-5 py-4 border-b border-slate-100 text-start space-y-1">
           <DialogTitle className="flex items-center gap-2.5 text-base font-semibold text-slate-900">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand shrink-0">
               <CalendarRange className="h-4 w-4" />
             </span>
             {isCollected
-              ? `ما تم تحصيله في اليوم ${day} من كل شهر`
-              : `الاشتراكات التي تتجدّد في اليوم ${day} من كل شهر`}
+              ? dt("المحصّل بتاريخ {0}", [calendarDateLabel(filters?.month ?? "", day ?? 0, getDashLocale())])
+              : dt("الدفعات المتوقعة بتاريخ {0}", [calendarDateLabel(filters?.month ?? "", day ?? 0, getDashLocale())])}
           </DialogTitle>
           {totals && !loading ? (
             <div className="flex flex-wrap gap-4 pt-1.5">
               <span className="text-[11px] text-slate-500">
-                العدد: <b className="text-slate-900 tabular-nums">{totals.count}</b>
+                {dt("العدد: ")}<b className="text-slate-900 tabular-nums">{totals.count}</b>
               </span>
               <span className="text-[11px] text-slate-500">
-                الإجمالي:{" "}
+                {dt("الإجمالي: ")}
                 <b className="text-slate-900 tabular-nums">{formatMoney(totals.amountUSD)}</b>
               </span>
             </div>
@@ -166,38 +184,34 @@ export function DayOfMonthDetailsDialog({ day, mode, filters, formatMoney, onClo
               <Loader2 className="w-7 h-7 animate-spin mx-auto text-brand" />
             </div>
           ) : error ? (
-            <EmptyState title="تعذّر تحميل التفاصيل" description={error} className="m-5" />
+            <EmptyState title={dt("تعذّر تحميل التفاصيل")} description={error} className="m-5" />
           ) : rows.length === 0 ? (
             <EmptyState
-              title="لا توجد بيانات لهذا اليوم"
+              title={dt("لا توجد بيانات لهذا اليوم")}
               description={
                 isCollected
-                  ? "لم تُسدَّد أي دفعة شهرية في هذا اليوم من أي شهر."
-                  : "لا يوجد اشتراك نشط مجدول للتجديد في هذا اليوم."
+                  ? dt("لم تُسدَّد أي دفعة دورية في هذا التاريخ.")
+                  : dt("لا يوجد اشتراك نشط مجدول للتجديد في هذا اليوم.")
               }
               className="m-5"
             />
           ) : (
-            <table className="w-full text-xs text-right leading-snug">
+            <table className="w-full text-xs text-start leading-snug">
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-slate-200 bg-slate-50/95 backdrop-blur">
-                  <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    المشترك
+                  <th className="text-start py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    {dt("المشترك")}</th>
+                  <th className="text-start py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                    {dt("المبلغ")}
                   </th>
-                  <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                    {isCollected ? "المبلغ" : "المبلغ الشهري"}
-                  </th>
-                  <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    الحالة
-                  </th>
-                  <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[200px]">
-                    المشروع / الفئة
-                  </th>
-                  <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    الإحالة
-                  </th>
-                  <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                    {isCollected ? "تاريخ الدفع" : "الدفعة القادمة"}
+                  <th className="text-start py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    {dt("الحالة")}</th>
+                  <th className="text-start py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[200px]">
+                    {dt("المشروع / الفئة")}</th>
+                  <th className="text-start py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    {dt("الإحالة")}</th>
+                  <th className="text-start py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                    {isCollected ? dt("تاريخ الدفع") : dt("الدفعة القادمة")}
                   </th>
                 </tr>
               </thead>
@@ -221,6 +235,9 @@ export function DayOfMonthDetailsDialog({ day, mode, filters, formatMoney, onClo
                           ≈ {formatMoney(r.amountUSD)}
                         </span>
                       ) : null}
+                      {r.frequency ? (
+                        <span className="block text-[10px] text-slate-500">{FREQUENCY_LABEL[r.frequency]}</span>
+                      ) : null}
                     </td>
                     <td className="py-2.5 px-3">
                       {r.status ? (
@@ -235,12 +252,12 @@ export function DayOfMonthDetailsDialog({ day, mode, filters, formatMoney, onClo
                     </td>
                     <td className="py-2.5 px-3 text-slate-600 max-w-[200px]">
                       {r.campaigns.length > 0 ? (
-                        <span className="block truncate" title={r.campaigns.map((c) => c.title).join("، ")}>
-                          {r.campaigns.map((c) => c.title).join("، ")}
+                        <span className="block truncate" title={r.campaigns.map((c) => c.title).join(dt("، "))}>
+                          {r.campaigns.map((c) => c.title).join(dt("، "))}
                         </span>
                       ) : r.categories.length > 0 ? (
-                        <span className="block truncate" title={r.categories.map((c) => c.name).join("، ")}>
-                          فئة: {r.categories.map((c) => c.name).join("، ")}
+                        <span className="block truncate" title={r.categories.map((c) => c.name).join(dt("، "))}>
+                          {dt("فئة: ")}{r.categories.map((c) => c.name).join(dt("، "))}
                         </span>
                       ) : (
                         <span className="text-slate-400">—</span>
@@ -251,7 +268,7 @@ export function DayOfMonthDetailsDialog({ day, mode, filters, formatMoney, onClo
                     </td>
                     <td className="py-2.5 px-3 text-slate-600 tabular-nums whitespace-nowrap">
                       {(() => {
-                        const dt = formatDateTime(isCollected ? r.paidAt : r.nextBillingDate);
+                        const dt = formatDateTime(isCollected ? r.paidAt : r.scheduledAt ?? r.nextBillingDate);
                         if (!dt) return <span className="text-slate-400">—</span>;
                         return (
                           <div className="flex flex-col leading-tight">

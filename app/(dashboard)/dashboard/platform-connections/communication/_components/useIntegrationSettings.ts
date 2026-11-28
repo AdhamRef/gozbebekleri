@@ -232,7 +232,9 @@ export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]
     const action = snapshot.enabled ? "DISABLE" : "ENABLE";
     const warning = active === "ELASTIC_EMAIL"
       ? dt("تعطيل Elastic Email سيوقف كل رسائل البريد الإلكتروني.")
-      : dt("تعطيل المزود قد يوقف إرسال الرسائل المرتبطة به.");
+      : active === "BREVO"
+        ? dt("تعطيل Brevo سيوقف SMS للأرقام الدولية.")
+        : dt("تعطيل المزود قد يوقف إرسال الرسائل المرتبطة به.");
     if (!window.confirm(dt("{0} هل تريد المتابعة؟", [warning]))) return;
     setBusy("toggle");
     try {

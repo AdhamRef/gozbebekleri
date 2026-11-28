@@ -1,3 +1,4 @@
+import { parseCartUpsell, validateCartUpsellBody } from "@/lib/minbar/cart-upsell";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
@@ -23,13 +24,16 @@ export async function GET() {
   try {
     const settings = await prisma.globalSettings.findFirst({
       orderBy: { createdAt: "asc" },
-      select: { suggestedTeamSupport: true, payforEnabled: true },
+      select: { suggestedTeamSupport: true, payforEnabled: true, teamSupportEnabled: true, cartUpsell: true },
     });
     return NextResponse.json({
       suggestedTeamSupport: parseSuggestedTeamSupport(settings?.suggestedTeamSupport),
       // Default true — first read before any record exists must still let
       // PayFor remain available for TRY donors.
       payforEnabled: settings?.payforEnabled ?? true,
+      // Cart settings (Minber #308 cart-settings page). Team support is on unless switched off.
+      teamSupportEnabled: settings?.teamSupportEnabled !== false,
+      cartUpsell: parseCartUpsell(settings?.cartUpsell),
     });
   } catch (e) {
     console.error("Error fetching global settings:", e);
@@ -44,6 +48,7 @@ export async function GET() {
  * PUT — partial update. Each field has its own permission requirement:
  *   - suggestedTeamSupport → `campaigns` perm
  *   - payforEnabled       → `generalSettings` perm
+ *   - teamSupportEnabled, cartUpsell → `campaigns` perm (cart settings)
  * A single request mixing both must satisfy both checks.
  */
 export async function PUT(request: NextRequest) {
@@ -57,7 +62,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    if (body.suggestedTeamSupport !== undefined) {
+    if (body.suggestedTeamSupport !== undefined || body.teamSupportEnabled !== undefined || body.cartUpsell !== undefined) {
       const denied = requireAdminOrDashboardPermission(session, "campaigns");
       if (denied) return denied;
     }
@@ -84,6 +89,21 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    if (body.teamSupportEnabled !== undefined) {
+      if (typeof body.teamSupportEnabled !== "boolean") {
+        return NextResponse.json({ error: "teamSupportEnabled must be a boolean" }, { status: 400 });
+      }
+      updateData.teamSupportEnabled = body.teamSupportEnabled;
+    }
+
+    if (body.cartUpsell !== undefined) {
+      try {
+        updateData.cartUpsell = body.cartUpsell === null ? null : (validateCartUpsellBody(body.cartUpsell) as unknown as Prisma.InputJsonValue);
+      } catch (e) {
+        return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid cartUpsell" }, { status: 400 });
+      }
+    }
+
     if (body.payforEnabled !== undefined) {
       if (typeof body.payforEnabled !== "boolean") {
         return NextResponse.json(
@@ -98,12 +118,14 @@ export async function PUT(request: NextRequest) {
     const saved = await prisma.globalSettings.update({
       where: { id: existing.id },
       data: updateData,
-      select: { suggestedTeamSupport: true, payforEnabled: true },
+      select: { suggestedTeamSupport: true, payforEnabled: true, teamSupportEnabled: true, cartUpsell: true },
     });
 
     return NextResponse.json({
       suggestedTeamSupport: parseSuggestedTeamSupport(saved.suggestedTeamSupport),
       payforEnabled: saved.payforEnabled,
+      teamSupportEnabled: saved.teamSupportEnabled !== false,
+      cartUpsell: parseCartUpsell(saved.cartUpsell),
     });
   } catch (e) {
     console.error("Error updating global settings:", e);

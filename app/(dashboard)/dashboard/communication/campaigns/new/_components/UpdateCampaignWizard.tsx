@@ -7,7 +7,7 @@ import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Check, ChevronLeft, FileText, Languages, Loader2, Mail, Megaphone, Sparkles, TriangleAlert, Users, Video } from "lucide-react";
-import { LOCALE_LABELS } from "@/lib/ported-systems/locales";
+import { LOCALE_LABELS } from "@/lib/locales";
 import { cn } from "@/lib/utils";
 import { dashDir, dashIntl, dt, dtList, dtx } from "@/lib/dashboard/i18n";
 

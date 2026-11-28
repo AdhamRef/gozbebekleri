@@ -138,6 +138,7 @@ model User {
   verifiedAt            DateTime?
   registeredAt          DateTime?
 
+  mergedIntoUserId      String? @db.ObjectId
 }
 
 /* ===================== CREDIT CARDS ===================== */
@@ -1375,6 +1376,17 @@ model GlobalSettings {
   // Fields required by the transferred systems; existing fields are retained.
   certificateCopy      Json?
 
+  /// Master switch for the basket's "support the team" step. Off, the step is
+  /// not shown and the order API ignores any amount sent.
+  teamSupportEnabled   Boolean  @default(true)
+  /// The basket's cross-sell block: `{ items: [{ campaignId, amounts }] }`.
+  /// Shape in `lib/minbar/cart-upsell.ts`; null or empty means the block's
+  /// built-in generic suggestions.
+  cartUpsell           Json?
+  /// The homepage quick-donation card and its dock: presets (with per-currency
+  /// overrides), frequencies, destinations, title. Shape and defaults in
+  /// `lib/minbar/quick-donation.ts`; null means "the defaults".
+  quickDonation        Json?
 }
 
 /* ===================== MARKETING PLATFORM CONNECTIONS ===================== */
@@ -2626,4 +2638,199 @@ type BankTransferReceiptFile {
 enum WaqfUnit {
   SHARE
   METER
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model GoogleSearchPlan {
+  workLeaseToken String?
+  workLeaseUntil DateTime?
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  connectionId String @db.ObjectId
+  title String
+  status String @default("DRAFT")
+  version Int @default(1)
+  request Json
+  proposal Json
+  evidence Json
+  resources Json?
+  lastError String?
+  automationEnabled Boolean @default(false)
+  automationPolicy Json?
+  lastReviewAt DateTime?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([connectionId, createdAt])
+  @@index([automationEnabled, lastReviewAt])
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// A donor's request for staff review. Creating a request never changes billing.
+model SubscriptionServiceRequest {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionId  String   @db.ObjectId
+  donorId         String   @db.ObjectId
+  activeKey       String   @unique
+  kind            String // AMOUNT_CHANGE | PAUSE | CANCEL
+  status          String   @default("NEW") // NEW | IN_PROGRESS | COMPLETED | REJECTED | WITHDRAWN
+  requestedAmount Float?
+  currency        String
+  locale          String
+  note            String
+  staffNote       String?
+  resolutionNote  String?
+  history         Json?
+  handledById     String?  @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime? // Resolution time; status distinguishes execution, rejection and withdrawal.
+  @@index([status, createdAt])
+  @@index([donorId, subscriptionId, createdAt])
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// Single-record settings collection for site-wide defaults. Read by clients
+/// (currently for team-support quick-pick amounts in the donation flow);
+/// writable only from the admin dashboard.
+model RecurringPageSettings {
+  id            String   @id @map("_id")
+  configuration Json
+  revision      String
+  updatedAt     DateTime @updatedAt
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// Frequently asked questions. `page` scopes an entry to one page; null shows it
+/// wherever FAQs are rendered.
+model Faq {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  question String
+  answer   String
+  page     String?
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  translations FaqTranslation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([page, isActive, order])
+  editorVersion String?
+  editorReviews Json?
+  metaTitle String?
+  metaDescription String?
+  imageAlt String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
+
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model FaqTranslation {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  faqId    String @db.ObjectId
+  locale   String
+  question String
+  answer   String
+
+  faq Faq @relation(fields: [faqId], references: [id], onDelete: Cascade)
+
+  @@unique([faqId, locale])
+  metaTitle String?
+  metaDescription String?
+  imageAlt String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
+
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// Short-lived results for long editor suggestions; content is applied only by the editor's save flow.
+model AiSuggestionTask {
+  id          String   @id @map("_id")
+  ownerId     String
+  permission  String
+  requestHash String
+  /// Null covers older tasks: require analytics permission conservatively on reads.
+  requiresAnalytics Boolean?
+  status      String   @default("QUEUED")
+  httpStatus  Int?
+  result      Json?
+  deadlineAt  DateTime
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([ownerId, status, deadlineAt], map: "content_editor_ownerId_status_deadlineAt")
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model EditorialJob {
+  priority Int @default(10)
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  key String @unique
+  kind String
+  status String @default("QUEUED")
+  locale String @default("ar")
+  sourceId String? @db.ObjectId
+  sourceRevision String?
+  targetRevision String?
+  fields Json?
+  result Json?
+  error String?
+  version String @default(uuid())
+  creationKey String @default(uuid())
+  resultContentId String? @db.ObjectId
+  attempts Int @default(0)
+  leaseToken String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, priority, createdAt])
+  @@index([sourceId, locale])
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model EditorialSettings {
+  leaseToken String?
+  leaseUntil DateTime?
+  id String @id @map("_id")
+  weeklyEnabled Boolean @default(true)
+  market String @default("")
+  updatedAt DateTime @updatedAt
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model ManagedPageSeo {
+  key String @id @map("_id")
+  overrides Json
+  version String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// Idempotent editor creation requests are committed with the content in one transaction.
+model ContentCreationRequest {
+  id String @id @map("_id")
+  kind String
+  contentId String @db.ObjectId
+  fingerprint String
+  createdAt DateTime @default(now())
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model ContentRouteReservation {
+  id String @id @map("_id")
+  kind String
+  contentId String @db.ObjectId
+  createdAt DateTime @default(now())
 }

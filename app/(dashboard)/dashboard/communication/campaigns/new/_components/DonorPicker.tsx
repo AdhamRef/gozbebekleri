@@ -9,7 +9,7 @@ import { FilterBar } from "@/components/dashboard/FilterBar";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Users, Check, Loader2, TriangleAlert, ShieldQuestion, X } from "lucide-react";
-import { LOCALE_LABELS, SUPPORTED_LOCALES } from "@/lib/ported-systems/locales";
+import { LOCALE_LABELS, SUPPORTED_LOCALES } from "@/lib/locales";
 import {
   AgeFilterSelect,
   GenderFilterSelect,

@@ -177,3 +177,71 @@ export function sanitizeDonationAttribution(raw: unknown): Prisma.InputJsonValue
 
   return Object.keys(out).length > 0 ? out : undefined;
 }
+
+/* Ported from Minber (#236 era): attribution URL safety helpers used by the dashboard's donation details.
+   safeAcquisitionLandingPage treats Gozbebekleri's own site as the landing host (Minber checked minberiaksa.org). */
+const SAFE_ATTRIBUTION_QUERY = /^(?:utm_[a-z0-9_]+|fbclid|fbc|fbp|gclid|dclid|gbraid|wbraid|ttclid|twclid|scclid|scid|sccid|msclkid|snap_click_id|li_fat_id|rdt_cid|campaign_id|adgroup_id|ad_group_id|adset_id|ad_id|creative_id|placement|publisher_platform|network|matchtype|keyword|ref|source|medium|campaign)$/i;
+const SENSITIVE_ATTRIBUTION_QUERY = /(?:token|secret|pass(?:word|code)|credential|authorization|auth(?:entication)?|api[_-]?key|receipt|session|nonce|signature|csrf|otp|jwt|ticket|(?:^|[_-])(?:t|code|key)(?:$|[_-]))/i;
+const PRIVATE_ATTRIBUTION_SEGMENT = /^(?:success|thank-?you|payment(?:-success|-failure|-failed|-processing)?|donation-success|donation-failed|receipts?|certificates?|invoices?|dashboard|admin|auth|signin|login|logout|account|profile|donor|verify|verification|reset(?:-password)?|callback|webhook|unsubscribe|guest|download|private|access(?:-token)?|tokens?)$/i;
+const OPAQUE_ATTRIBUTION_SEGMENT = /^(?=.{32,}$)(?=.*[a-z])(?=.*[0-9])[a-z0-9_-]+$/i;
+function attributionPathSegments(pathname: string): string[] | null {
+  try {
+    // Decode nested path encodings so /%2572eceipt/<token> is not missed.
+    let decoded = pathname;
+    for (let i = 0; i < 3; i++) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    }
+    return decoded.split("/").filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
+export function safeAttributionUrl(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const url = new URL(raw.trim());
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    url.username = "";
+    url.password = "";
+    url.hash = "";
+    const pathSegments = attributionPathSegments(url.pathname);
+    if (!pathSegments || pathSegments.some((part) => PRIVATE_ATTRIBUTION_SEGMENT.test(part) || OPAQUE_ATTRIBUTION_SEGMENT.test(part))) return null;
+    for (const name of [...url.searchParams.keys()]) {
+      if (!SAFE_ATTRIBUTION_QUERY.test(name) || SENSITIVE_ATTRIBUTION_QUERY.test(name)) url.searchParams.delete(name);
+    }
+    return url.toString().slice(0, 2048);
+  } catch { return null; }
+}
+
+export function isPaymentReturnPage(raw: unknown): boolean {
+  if (typeof raw !== "string" || !raw.trim()) return false;
+  try {
+    const url = new URL(raw.trim());
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    // Inspect the original path: safeAttributionUrl intentionally rejects
+    // private success routes and must not make the return-page test disappear.
+    const segments = attributionPathSegments(url.pathname);
+    return Boolean(segments?.some((part) =>
+      /^(?:success|thank-?you|payment-success|payment-failed|payment-failure|payment-processing|donation-success|donation-failed)$/.test(part.toLowerCase())));
+  } catch { return false; }
+}
+
+/** The current /success/{id}?t=... is NOT the campaign landing page.
+ * Use the last genuine campaign entry; if it is a bank return or another
+ * site, use the original first landing. Never invent a landing page.
+ */
+export function safeAcquisitionLandingPage(attribution: Record<string, unknown> | null | undefined): string | null {
+  const attr = attribution ?? {};
+  for (const candidate of [attr.landing_page, attr.first_landing_page]) {
+    const safe = safeAttributionUrl(candidate);
+    if (!safe || isPaymentReturnPage(safe)) continue;
+    const host = new URL(safe).hostname.toLowerCase();
+    if (host === "gozbebekleri.org" || host.endsWith(".gozbebekleri.org")) {
+      return safe;
+    }
+  }
+  return null;
+}

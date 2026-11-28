@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Mail } from "lucide-react";
 import type { EmailDocument } from "@/components/email-builder";
 import { defaultDocument } from "@/components/email-builder";
-import { SUPPORTED_LOCALES, LOCALE_LABELS, DEFAULT_LOCALE, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
+import { SUPPORTED_LOCALES, LOCALE_LABELS, DEFAULT_LOCALE, type SupportedLocale } from "@/lib/locales";
 import { TemplateDialogShell, LocaleStrip, FieldLabel } from "./TemplateDialogShell";
 import { dt } from "@/lib/dashboard/i18n";
 

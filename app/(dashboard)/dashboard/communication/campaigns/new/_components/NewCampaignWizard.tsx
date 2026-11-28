@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Check, ChevronLeft, Loader2, FileText, Languages, Users, TriangleAlert, Gauge, Zap, Moon, ShieldCheck, Tag } from "lucide-react";
-import { LOCALE_LABELS } from "@/lib/ported-systems/locales";
+import { LOCALE_LABELS } from "@/lib/locales";
 import { cn } from "@/lib/utils";
 import { CHANNEL_META } from "../../_components/campaign-ui";
 import { SmartAudienceBuilder, type SmartAudienceDraft, type SmartAudiencePreview } from "./SmartAudienceBuilder";
@@ -53,7 +53,7 @@ const TIMEZONE_OPTIONS = [
   ["UTC", "UTC"],
 ] as const;
 
-const CHANNEL_ORDER = ["EMAIL", "WHATSAPP"] as const;
+const CHANNEL_ORDER = ["EMAIL", "WHATSAPP", "SMS"] as const;
 const BASE_STEPS = dtList(["القناة", "الرسالة", "الجمهور", "اللغة"] as const);
 
 type CampaignSendControlsDraft = {
@@ -150,7 +150,7 @@ function CampaignCoveragePreview({ coverage }: { coverage: CampaignLanguageCover
           {coverage.locales.filter((locale) => locale.recipientCount > 0).map((locale) => (
             <div key={locale.locale} className={cn("rounded-lg border p-3 text-xs", locale.status === "EXISTS" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900")}>
               <div className="flex items-center justify-between gap-3 font-semibold">
-                <span>{LOCALE_LABELS[locale.locale] ?? locale.label}</span>
+                <span>{LOCALE_LABELS[locale.locale as keyof typeof LOCALE_LABELS] ?? locale.label}</span>
                 <span dir="ltr">{locale.recipientCount.toLocaleString("en-US")}</span>
               </div>
               <p className="mt-1">{locale.status === "EXISTS" ? dt("نسخة متاحة") : dt("نسخة غير متاحة؛ يلزم تجهيزها أو استبعاد اللغة صراحةً قبل الإرسال.")}</p>
@@ -257,7 +257,7 @@ export function NewCampaignWizard() {
   const chosenTemplate = templates.find((t) => t.id === templateId) ?? null;
 
   React.useEffect(() => {
-    if (!channel || !["EMAIL", "WHATSAPP"].includes(channel)) return;
+    if (!channel || !["EMAIL", "WHATSAPP", "SMS"].includes(channel)) return;
     setSmartAudience((current) => ({ ...current, channel: channel as SmartAudienceDraft["channel"] }));
     setSavedListId("");
     setBadgeId("");
@@ -446,6 +446,7 @@ export function NewCampaignWizard() {
                 <span className="text-[11px] leading-5 text-slate-500">
                   {id === "EMAIL" && dt("موضوع ومحتوى كامل، ويدعم الفتح والنقر في التقارير.")}
                   {id === "WHATSAPP" && dt("يستخدم قالبًا معتمدًا من Meta على الرقم الافتراضي، حسب لغة المتبرع.")}
+                  {id === "SMS" && dt("نص فقط، ويُحاسب بالمقطع  العربية ٧٠ حرفًا للمقطع.")}
                 </span>
               </button>
             );
