@@ -40,7 +40,7 @@ function browser(cookies: Record<string, string>, nav?: Record<string, unknown>)
     get cookie() { return [...jar].map(([k, v]) => `${k}=${v}`).join("; "); },
     set cookie(line: string) { const [pair] = line.split(";"); const i = pair.indexOf("="); const k = pair.slice(0, i), v = pair.slice(i + 1); if (/Max-Age=0/i.test(line)) jar.delete(k); else jar.set(k, v); },
   };
-  const window = { location: { href: "https://minberiaksa.org/ar/checkout", search: "" } };
+  const window = { location: { href: "https://gozbebekleri.org/ar/checkout", search: "" } };
   const loaded = { exports: {} as { getDonationAttributionPayload: () => Record<string, string> } };
   const out = ts.transpileModule(fs.readFileSync("lib/attribution/client-payload.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   new vm.Script(out).runInNewContext({ module: loaded, exports: loaded.exports, window, document, Date, Math, URLSearchParams, ...(nav ? { navigator: nav } : {}),
