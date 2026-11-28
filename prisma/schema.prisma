@@ -138,6 +138,7 @@ model User {
   verifiedAt            DateTime?
   registeredAt          DateTime?
 
+  mergedIntoUserId      String? @db.ObjectId
 }
 
 /* ===================== CREDIT CARDS ===================== */
