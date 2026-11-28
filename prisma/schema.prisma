@@ -2694,3 +2694,57 @@ model RecurringPageSettings {
   revision      String
   updatedAt     DateTime @updatedAt
 }
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// Frequently asked questions. `page` scopes an entry to one page; null shows it
+/// wherever FAQs are rendered.
+model Faq {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  question String
+  answer   String
+  page     String?
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  translations FaqTranslation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([page, isActive, order])
+  editorVersion String?
+  editorReviews Json?
+  metaTitle String?
+  metaDescription String?
+  imageAlt String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
+
+}
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model FaqTranslation {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  faqId    String @db.ObjectId
+  locale   String
+  question String
+  answer   String
+
+  faq Faq @relation(fields: [faqId], references: [id], onDelete: Cascade)
+
+  @@unique([faqId, locale])
+  metaTitle String?
+  metaDescription String?
+  imageAlt String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
+
+}
