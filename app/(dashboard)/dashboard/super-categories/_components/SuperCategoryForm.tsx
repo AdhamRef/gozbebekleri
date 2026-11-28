@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { errorMessage } from '@/lib/dashboard/client-error-message';
+import { useDashboardUnsavedChanges } from '@/hooks/useDashboardUnsavedChanges';
 import {
   ContentTranslationTabs,
   emptyTranslations,
@@ -40,8 +41,13 @@ export const SUPER_CATEGORY_TRANSLATION_FIELDS: readonly TranslationField[] = [
 
 /** Kinds in the order the picker shows them, with their Arabic labels. */
 export const ITEM_KINDS: ReadonlyArray<{ kind: string; label: string; hint: string }> = [
- {kind: 'CAMPAIGN', label: 'المشاريع', hint: 'المشاريع المرتبطة بهذا القسم'},
- {kind: 'POST', label: 'المقالات', hint: 'مقالات المدونة المرتبطة'}
+  { kind: 'CAMPAIGN', get label() { return dt("المشاريع"); }, get hint() { return dt("تظهر كبطاقات تبرع في قسم «المشاريع المرتبطة»."); } },
+  { kind: 'POST', get label() { return dt("المقالات"); }, get hint() { return dt("مقالات المدونة المرتبطة بهذا القسم."); } },
+  { kind: 'VIDEO', get label() { return dt("الفيديوهات"); }, get hint() { return dt("من مكتبة الفيديوهات (إنجازات، تزكيات، ميدان)."); } },
+  { kind: 'PLAYLIST', get label() { return dt("البرامج والسلاسل"); }, get hint() { return dt("قوائم التشغيل المرتبطة."); } },
+  { kind: 'COURSE', get label() { return dt("الدورات"); }, get hint() { return dt("الدورات والندوات المرتبطة."); } },
+  { kind: 'REPORT', get label() { return dt("التقارير"); }, get hint() { return dt("ملفات التقارير المنشورة."); } },
+  { kind: 'BOOKLET', get label() { return dt("الكتيبات"); }, get hint() { return dt("كتيبات المؤسسة."); } },
 ];
 
 export type ItemsMap = Record<string, string[]>;
@@ -117,6 +123,15 @@ export function SuperCategoryForm({
   const [values, setValues] = useState<SuperCategoryFormValues>(initial);
   const [saving, setSaving] = useState(false);
   const [options, setOptions] = useState<OptionsMap>({});
+  const [saveMessage, setSaveMessage] = useState('');
+  const [savedSnapshot, setSavedSnapshot] = useState(initial);
+  const dirty = JSON.stringify(values) !== JSON.stringify(savedSnapshot);
+  useDashboardUnsavedChanges(dirty && !saving);
+
+  const leave = () => {
+    if (dirty && !window.confirm(dt("توجد تعديلات غير محفوظة. مغادرة المحرر؟"))) return;
+    router.push('/dashboard/super-categories');
+  };
 
   /* Everything this page can link, fetched once. The picker only stores ids, so
      without this it could not show a name for anything already chosen. */
@@ -136,12 +151,21 @@ export function SuperCategoryForm({
     e.preventDefault();
     if (!values.title.trim()) return toast.error(dt("العنوان بالعربية مطلوب"));
     if (!values.slug.trim()) return toast.error(dt("المعرّف (slug) مطلوب"));
+    if (mode === 'edit' && values.slug !== initial.slug)
+      return toast.error(dt("تغيير رابط منشور يتطلب تأكيدًا وتحويلًا دائمًا. لا يمكن تغييره من نموذج الترجمة."));
+    // The server deletes a locale row when its title is blank. Prevent a
+    // partially translated row from being silently discarded on Save All.
+    const orphan = Object.entries(values.translations).find(([, row]) =>
+      !row.title?.trim() && Object.entries(row).some(([key, text]) => key !== 'title' && text.trim())
+    );
+    if (orphan) return toast.error(dt("لغة {0}: اكتب العنوان أولًا حتى لا تُفقد حقول الترجمة عند الحفظ.", [orphan[0].toUpperCase()]));
 
     setSaving(true);
+    setSaveMessage('');
     try {
       const payload = {
         ...values,
-        slug: values.slug.trim(),
+        slug: mode === 'edit' ? initial.slug : values.slug.trim(),
         title: values.title.trim(),
         /* Posted whole; the API replaces both stored lists with exactly these. */
         items: values.items,
@@ -151,17 +175,34 @@ export function SuperCategoryForm({
         })),
       };
 
-      if (mode === 'create') {
-        await axios.post('/api/super-categories', payload);
-        toast.success(dt("تم إنشاء القسم الكبير"));
-      } else {
-        await axios.put(`/api/super-categories/${superCategoryId}`, payload);
-        toast.success(dt("تم حفظ القسم الكبير"));
+      const response = mode === 'create'
+        ? await axios.post('/api/super-categories', payload)
+        : await axios.put(`/api/super-categories/${superCategoryId}`, payload);
+      const actual = response.data?.translations;
+      // Require complete server confirmation for both created and edited records.
+      // Check cleared fields and deleted locale rows as well as non-empty values.
+      if (!Array.isArray(actual)) throw new Error(dt("لم يعُد الخادم بقائمة الترجمات للتحقق من الحفظ. احتفظ بالمسودة وأعد التحميل."));
+      for (const [code, fields] of Object.entries(values.translations)) {
+        const stored = actual.find((row: { locale?: string }) => row.locale === code) as Record<string, unknown> | undefined;
+        if (!fields.title?.trim()) {
+          if (stored) throw new Error(dt("لغة {0} لم تُحذف من النسخة المحفوظة.", [code.toUpperCase()]));
+          continue;
+        }
+        if (!stored) throw new Error(dt("لم تُحفظ ترجمة اللغة {0}.", [code.toUpperCase()]));
+        for (const [key, text] of Object.entries(fields)) {
+          if (String(stored[key] ?? '').trim() !== text.trim())
+            throw new Error(dt("لم يتم تأكيد حفظ حقل {0} في اللغة {1}. احتفظ بالمسودة وراجع الحفظ.", [key, code.toUpperCase()]));
+        }
       }
+      toast.success(mode === 'create' ? dt("تم إنشاء المشروع الكبير") : dt("تم حفظ جميع لغات المشروع الكبير"));
+      setSavedSnapshot(values);
+      setSaveMessage(dt("حُفظت جميع اللغات مع محتوى الصفحة بنجاح."));
       router.push('/dashboard/super-categories');
       router.refresh();
     } catch (err) {
-      toast.error(errorMessage(err, mode === 'create' ? dt("فشل في الإنشاء") : dt("فشل في الحفظ")));
+      const message = errorMessage(err, mode === 'create' ? dt("فشل في الإنشاء") : dt("فشل في الحفظ"));
+      setSaveMessage(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -173,10 +214,10 @@ export function SuperCategoryForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button type="button" variant="ghost" size="sm" onClick={() => router.push('/dashboard/super-categories')}>
+        <Button type="button" variant="ghost" size="sm" onClick={leave}>
           <ArrowRight className="me-1 h-4 w-4" />
           {dt("رجوع")}</Button>
-        <h1 className="text-lg font-bold">{mode === 'create' ? dt("قسم كبير جديد") : dt("تعديل القسم الكبير")}</h1>
+        <h1 className="text-lg font-bold">{mode === 'create' ? dt("قسم كبير جديد") : dt("تعديل المشروع الكبير")}</h1>
       </div>
 
       {/* ── Identity ─────────────────────────────────────────────────── */}
@@ -189,9 +230,10 @@ export function SuperCategoryForm({
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-slate-600">{dt("المعرّف (slug) *")}</span>
-            <Input dir="ltr" value={values.slug} onChange={(e) => set('slug', e.target.value)} />
+            <Input dir="ltr" value={values.slug} readOnly={mode === 'edit'} aria-readonly={mode === 'edit'} onChange={(e) => set('slug', e.target.value)} />
+            {mode === 'edit' ? <span className="block text-[11px] text-amber-700">{dt("الرابط المنشور ثابت. تعديل الرابط يتطلب مسارًا منفصلًا يحفظ تحويل 301.")}</span> : null}
             <span className="block text-[11px] text-slate-500">
-              {dt("الصفحة تصبح على الرابط ")}<span dir="ltr">{dtx("/{lang}/programs/{0}", [values.slug || 'slug'])}</span>
+              {dt("الصفحة تصبح على الرابط ")}<span dir="ltr">{dtx("/{lang}/المشاريع/{0}", [values.slug || 'slug'])}</span>
             </span>
           </label>
           <label className="space-y-1.5">
@@ -346,10 +388,11 @@ export function SuperCategoryForm({
         />
       </Card>
 
+      {saveMessage ? <p role="status" className="rounded-lg border p-3 text-sm">{saveMessage}</p> : null}
       <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving || !dirty && mode === 'edit'}>
           {saving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
-          {mode === 'create' ? dt("إنشاء") : dt("حفظ")}
+          {mode === 'create' ? dt("إنشاء") : dt("حفظ جميع اللغات")}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.push('/dashboard/super-categories')}>
           {dt("إلغاء")}</Button>

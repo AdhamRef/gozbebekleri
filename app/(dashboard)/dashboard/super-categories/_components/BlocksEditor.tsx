@@ -130,7 +130,7 @@ export function BlocksEditor({
                 <Select value={row.kind} onValueChange={(v) => set(index, { kind: v })}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {Object.entries(BLOCK_KIND_LABELS).filter(([key]) => ["CAMPAIGNS", "POSTS", "TEXT", "VIDEO"].includes(key)).map(([value, label]) => (
+                    {Object.entries(BLOCK_KIND_LABELS).map(([value, label]) => (
                       <SelectItem key={value} value={value}>{label}</SelectItem>
                     ))}
                   </SelectContent>

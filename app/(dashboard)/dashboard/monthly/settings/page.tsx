@@ -68,7 +68,7 @@ export default function RecurringPageSettingsPage() {
           <div><h3 className="mb-3 text-sm font-semibold">{dt("ترتيب المشاريع المختارة")}</h3>{!draft.projectIds.length ? <p className="rounded-lg bg-amber-50 p-3 text-sm">{dt("اختر مشروعًا منشورًا واحدًا على الأقل")}</p> : <ol className="space-y-2">{draft.projectIds.map((id, index) => <li key={id} className="flex items-center gap-2 rounded-lg border p-3"><span className="text-xs text-slate-500">{index + 1}</span><span className="min-w-0 flex-1 break-words text-sm">{titles.get(id) || dt("مشروع لم يعد منشورًا")}</span><Button size="icon" variant="ghost" type="button" disabled={index === 0} aria-label={dt("تقديم {0}", [titles.get(id) || id])} onClick={() => move(index, -1)}><ArrowUp className="h-4 w-4" /></Button><Button size="icon" variant="ghost" type="button" disabled={index === draft.projectIds.length - 1} aria-label={dt("تأخير {0}", [titles.get(id) || id])} onClick={() => move(index, 1)}><ArrowDown className="h-4 w-4" /></Button><Button variant="ghost" type="button" onClick={() => setDraft(previous => previous ? { ...previous, projectIds: previous.projectIds.filter(value => value !== id) } : previous)}>{dt("إزالة")}</Button></li>)}</ol>}</div></div> : <p className="text-sm text-slate-500">{dt("أي مشروع جديد منشور يضاف تلقائيًا إلى الخيارات.")}</p>}
       </Card>
       <p className="text-sm text-slate-500">{dt("هذه الإعدادات للخطط الجديدة. تبقى الاشتراكات الحالية بمشاريعها ومبالغها ومواعيدها.")}</p>
-      {/* Gozbebekleri has no public recurring-donation page yet, so there is no page to open. */}
+      <Button asChild variant="outline"><Link href="/ar/recurring-donation" target="_blank" rel="noopener noreferrer">{dt("فتح الصفحة")}</Link></Button>
     </fieldset> : null}
   </div>;
 }
