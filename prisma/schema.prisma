@@ -2652,3 +2652,27 @@ model GoogleSearchPlan {
   @@index([connectionId, createdAt])
   @@index([automationEnabled, lastReviewAt])
 }
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+/// A donor's request for staff review. Creating a request never changes billing.
+model SubscriptionServiceRequest {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionId  String   @db.ObjectId
+  donorId         String   @db.ObjectId
+  activeKey       String   @unique
+  kind            String // AMOUNT_CHANGE | PAUSE | CANCEL
+  status          String   @default("NEW") // NEW | IN_PROGRESS | COMPLETED | REJECTED | WITHDRAWN
+  requestedAmount Float?
+  currency        String
+  locale          String
+  note            String
+  staffNote       String?
+  resolutionNote  String?
+  history         Json?
+  handledById     String?  @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime? // Resolution time; status distinguishes execution, rejection and withdrawal.
+  @@index([status, createdAt])
+  @@index([donorId, subscriptionId, createdAt])
+}
