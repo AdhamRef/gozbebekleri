@@ -1376,6 +1376,13 @@ model GlobalSettings {
   // Fields required by the transferred systems; existing fields are retained.
   certificateCopy      Json?
 
+  /// Master switch for the basket's "support the team" step. Off, the step is
+  /// not shown and the order API ignores any amount sent.
+  teamSupportEnabled   Boolean  @default(true)
+  /// The basket's cross-sell block: `{ items: [{ campaignId, amounts }] }`.
+  /// Shape in `lib/minbar/cart-upsell.ts`; null or empty means the block's
+  /// built-in generic suggestions.
+  cartUpsell           Json?
 }
 
 /* ===================== MARKETING PLATFORM CONNECTIONS ===================== */
