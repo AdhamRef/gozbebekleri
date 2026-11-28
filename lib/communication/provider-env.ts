@@ -4,7 +4,7 @@
  * keys are missing  WITHOUT ever returning a secret value. Safe to surface to readiness UIs via an
  * operations-guarded API (only booleans + missing key NAMES + a safe label leave this module).
  *
- * Final architecture: WhatsApp = Meta, Email = Elastic Email, SMS has been retired;
+ * Final architecture: WhatsApp = Meta, Email = Elastic Email, SMS int'l = Brevo, SMS Turkey = Netgsm,
  * Legacy providers are intentionally absent from this active readiness module.
  */
 
@@ -36,12 +36,16 @@ export function getElasticEmailConfig(): ProviderConfigStatus {
 
 /** Brevo transactional SMS (international / non-Turkish numbers). */
 export function getBrevoSmsConfig(): ProviderConfigStatus {
-  return { configured: false, missing: [], safeLabel: "CHANNEL_REMOVED" };
+  const required = ["BREVO_API_KEY", "BREVO_SMS_SENDER"];
+  const missing = missingOf(required);
+  return { configured: missing.length === 0, missing, safeLabel: "Brevo SMS" };
 }
 
 /** Netgsm SMS (Turkish numbers only). */
 export function getNetgsmSmsConfig(): ProviderConfigStatus {
-  return { configured: false, missing: [], safeLabel: "CHANNEL_REMOVED" };
+  const required = ["NETGSM_USERCODE", "NETGSM_PASSWORD", "NETGSM_HEADER"];
+  const missing = missingOf(required);
+  return { configured: missing.length === 0, missing, safeLabel: "Netgsm SMS" };
 }
 
 /** Optional default WhatsApp phone number id (multi-number routing prefers the sender's own id). */
@@ -51,5 +55,5 @@ export function metaDefaultPhoneNumberId(): string | null {
 
 /** Brevo default SMS type (transactional | marketing); defaults to transactional. */
 export function brevoSmsDefaultType(): "transactional" | "marketing" {
-  return "transactional";
+  return process.env.BREVO_SMS_DEFAULT_TYPE?.trim() === "marketing" ? "marketing" : "transactional";
 }

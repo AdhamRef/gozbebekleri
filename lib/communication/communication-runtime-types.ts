@@ -6,19 +6,18 @@
  * Historical ids remain accepted only so old delivery rows can still be read safely.
  */
 
-export const COMMUNICATION_CHANNELS = ["WHATSAPP", "EMAIL"] as const;
-// SMS is retained only for reading historical database records.
-export type CommunicationChannelId = (typeof COMMUNICATION_CHANNELS)[number] | "SMS";
+export const COMMUNICATION_CHANNELS = ["WHATSAPP", "EMAIL", "SMS"] as const;
+export type CommunicationChannelId = (typeof COMMUNICATION_CHANNELS)[number];
 
 export const ACTIVE_COMMUNICATION_PROVIDERS = [
   "META_WHATSAPP",
   "ELASTIC_EMAIL",
+  "BREVO_SMS",
+  "NETGSM_SMS",
 ] as const;
 export type ActiveCommunicationProviderId = (typeof ACTIVE_COMMUNICATION_PROVIDERS)[number];
 
 export const HISTORICAL_COMMUNICATION_PROVIDERS = [
-  "BREVO_SMS",
-  "NETGSM_SMS",
   "BREVO_EMAIL",
   "SENDGRID",
   "NETGSM",
@@ -126,7 +125,7 @@ export function isActiveCommunicationProvider(value: unknown): value is ActiveCo
 }
 
 export function isActiveSenderProvider(channel: string, provider: unknown): provider is ActiveCommunicationProviderId {
-  return channel === "WHATSAPP" ? provider === "META_WHATSAPP" : channel === "EMAIL" ? provider === "ELASTIC_EMAIL" : false;
+  return channel === "WHATSAPP" ? provider === "META_WHATSAPP" : channel === "EMAIL" ? provider === "ELASTIC_EMAIL" : channel === "SMS" && (provider === "NETGSM_SMS" || provider === "BREVO_SMS");
 }
 
 export function isCommunicationProvider(value: unknown): value is CommunicationProviderId {

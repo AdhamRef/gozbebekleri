@@ -11,6 +11,7 @@ import { sendPreparedDelivery } from "./provider-router";
 import { resolveTriggerSendConfig, resolveTriggerSender, type TriggerSendConfig } from "@/lib/events/dispatch";
 import { resolveMetaTemplateMapping } from "./automatic-message-dispatcher";
 import { buildMetaComponents } from "./providers/meta-whatsapp/parameters";
+import { resolveSmsProvider } from "./providers/sms/client";
 import { checkRetryRecipient, retryDefinitelyNotSent, type RetryRecipientCode } from "./retry-recipient-guard";
 import {
   reserveWhatsappMarketingSend,
@@ -240,7 +241,9 @@ export async function retryDelivery(deliveryId: string, opts: { actorId?: string
     payload = { channel, sender: { provider, phoneNumberId: routed.sender.phoneNumberId }, to: recipient, templateName: meta.name, languageCode: meta.language, components: row.campaignId ? trackCampaignMetaButtons({ campaign: { id: row.campaignId, channel }, componentsSchema: meta.componentsSchema, components: built.components }) : built.components };
   } else {
     if (!renderedBody) return result(deliveryId, "NO_RENDERED_BODY", base);
-    return result(deliveryId, "NOT_RETRYABLE_STATUS");
+    const route = await resolveSmsProvider(null, recipient);
+    provider = route.provider;
+    payload = { channel, to: recipient, html: renderedBody };
   }
   // Omitting these fields made marketing retries use transactional transport.
   payload.purpose = row.purpose as CommunicationPurposeId;
