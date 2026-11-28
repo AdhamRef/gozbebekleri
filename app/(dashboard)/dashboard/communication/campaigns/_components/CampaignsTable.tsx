@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, ChevronsUpDown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LOCALE_LABELS } from "@/lib/ported-systems/locales";
+import { LOCALE_LABELS } from "@/lib/locales";
 import { type CampaignRow, channelMeta, statusMeta, hasResults, audienceLabel } from "./campaign-ui";
 import { CampaignRowActions } from "./CampaignRowActions";
 import { campaignBlockLabel } from "./CampaignRecoveryDialog";
@@ -165,7 +165,13 @@ export function CampaignsTable({
               return (
                 <tr
                   key={c.id}
-                  onClick={() => router.push(href)}
+                  onClick={event => {
+                    // React portal events bubble through this row even though the dialog is
+                    // outside the table. Actions must never navigate away from an active send.
+                    const target = event.target as HTMLElement;
+                    if (!event.currentTarget.contains(target) || target.closest("button, a, input, select, textarea, [role='dialog'], [role='alertdialog'], [role='menu']")) return;
+                    router.push(href);
+                  }}
                   className="cursor-pointer border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/70"
                 >
                   <td className="min-w-[12rem] max-w-[20rem] px-3 py-2.5 align-middle">
@@ -251,4 +257,5 @@ export function CampaignsTable({
     </div>
   );
 }
+
 

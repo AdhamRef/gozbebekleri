@@ -95,11 +95,13 @@ export default async function HealthPage() {
   if (!access.allowed) redirect(access.redirectTo);
   const session = access.session;
   const actor = integrationActorFromSession(session);
-  const [webhooks, scheduler, meta, elasticEmail, cron] = await Promise.all([
+  const [webhooks, scheduler, meta, elasticEmail, brevo, netgsm, cron] = await Promise.all([
     getWebhooksReadiness(),
     getSchedulerStatus(),
     integrationSettingsService.getProviderSnapshot("META_WHATSAPP", actor).then(withActiveTestState),
     integrationSettingsService.getProviderSnapshot("ELASTIC_EMAIL", actor).then(withActiveTestState),
+    integrationSettingsService.getProviderSnapshot("BREVO", actor).then(withActiveTestState),
+    integrationSettingsService.getProviderSnapshot("NETGSM", actor).then(withActiveTestState),
     integrationSettingsService.getProviderSnapshot("SYSTEM", actor).then(withActiveTestState),
   ]);
 
@@ -127,6 +129,8 @@ export default async function HealthPage() {
   const checks: Check[] = [
     providerRow("Meta WhatsApp", meta, dt("التكوين العامل لحساب Meta ورقم واتساب.")),
     providerRow("Elastic Email", elasticEmail, dt("التكوين العامل للحساب ونطاق بريد المرسل دون إرسال.")),
+    providerRow("Brevo SMS", brevo, dt("التكوين العامل لـSMS الدولي دون إرسال.")),
+    providerRow("Netgsm SMS", netgsm, dt("التكوين العامل لحساب Netgsm.")),
     {
       label: "Cron",
       state: cronState,
@@ -161,7 +165,7 @@ export default async function HealthPage() {
         eyebrow={dt("ربط المنصات والإرسال / فحص الاتصال")}
         title={dt("فحص الاتصال")}
         subtitle={dt("يعرض آخر نتائج الفحص الآمنة فقط، دون إرسال رسائل أو تشغيل حملات.")}
-        actions={canTest ? <RecheckConnectionsButton providers={["META_WHATSAPP", "ELASTIC_EMAIL", "SYSTEM"]} /> : undefined}
+        actions={canTest ? <RecheckConnectionsButton providers={["META_WHATSAPP", "ELASTIC_EMAIL", "BREVO", "NETGSM", "SYSTEM"]} /> : undefined}
       />
       <Card>
         <CardHeader

@@ -10,7 +10,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LOCALE_LABELS } from "@/lib/ported-systems/locales";
+import { LOCALE_LABELS } from "@/lib/locales";
 import { cn } from "@/lib/utils";
 import { fmtFull, type StageBuilder } from "./channel-ui";
 import { dashDir, dt } from "@/lib/dashboard/i18n";

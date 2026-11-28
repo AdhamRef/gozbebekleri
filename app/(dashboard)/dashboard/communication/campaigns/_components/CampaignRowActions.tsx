@@ -71,6 +71,7 @@ export function CampaignRowActions({
   onChanged: () => void;
 }) {
   const [busy, setBusy] = React.useState(false);
+  const sendingRef = React.useRef(false);
   const [plan, setPlan] = React.useState<SendPlan | null>(null);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [controlsOpen, setControlsOpen] = React.useState(false);
@@ -183,7 +184,9 @@ export function CampaignRowActions({
   };
 
   const send = async () => {
-    setConfirmOpen(false);
+    // Synchronous guard prevents duplicate sends before React updates busy.
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setBusy(true);
     try {
       if (canConfirm) {
@@ -214,17 +217,21 @@ export function CampaignRowActions({
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
+      sendingRef.current = false;
       setBusy(false);
+      setConfirmOpen(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-end gap-1.5">
+    <div className="flex items-center justify-end gap-1.5" onClick={event => event.stopPropagation()}>
       {canSend ? <button type="button" disabled={busy} onClick={event=>{event.stopPropagation();void openSend();}} className="inline-flex min-h-9 items-center gap-1 rounded-md bg-brand px-3 text-xs font-semibold text-white disabled:opacity-50"><Send className="h-3.5 w-3.5" />{dt("إرسال الآن")}</button> : null}
       {scheduleOpen ? <CampaignScheduleDialog campaign={campaign} onChanged={onChanged} onClose={() => setScheduleOpen(false)} /> : null}
       {campaign.status === "BLOCKED" ? <button type="button" onClick={event => { event.stopPropagation(); setRecoveryOpen(true); }} className="inline-flex h-8 items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 text-xs font-semibold text-sky-900">{dt("تشخيص واستكمال")}</button> : null}
       {canReviewFailures && campaign.status !== "BLOCKED" ? <button type="button" onClick={event => { event.stopPropagation(); setRetryOpen(true); }} className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-xs font-semibold text-amber-900"><RefreshCw className="h-3.5 w-3.5" />{dt("إعادة محاولة الفشل")}</button> : null}
-      <DropdownMenu>
+      {/* Menu actions open separately modal AlertDialogs. A modal DropdownMenu
+          can leave body pointer events locked after a confirmation closes. */}
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -275,7 +282,7 @@ export function CampaignRowActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      {canReviewFailures && ["WHATSAPP", "EMAIL"].includes(campaign.channel) ? <RetryDialog open={retryOpen} channel={campaign.channel as "WHATSAPP" | "EMAIL" | "SMS"} ids={null} days={30} campaignId={campaign.id} campaignName={campaign.name} purposeGroup="MARKETING" onOpenChange={setRetryOpen} onFinished={onChanged} /> : null}
+      {canReviewFailures && ["WHATSAPP", "EMAIL", "SMS"].includes(campaign.channel) ? <RetryDialog open={retryOpen} channel={campaign.channel as "WHATSAPP" | "EMAIL" | "SMS"} ids={null} days={30} campaignId={campaign.id} campaignName={campaign.name} purposeGroup="MARKETING" onOpenChange={setRetryOpen} onFinished={onChanged} /> : null}
       <CampaignRecoveryDialog open={recoveryOpen} onOpenChange={setRecoveryOpen} campaignId={campaign.id} campaignName={campaign.name} onChanged={onChanged} canControl={canControl} onControls={() => { setRecoveryOpen(false); setControlsOpen(true); }} />
       <CampaignControlsDialog
         open={controlsOpen}
@@ -285,7 +292,7 @@ export function CampaignRowActions({
         onChanged={onChanged}
       />
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog open={confirmOpen} onOpenChange={open => { if (!sendingRef.current) setConfirmOpen(open); }}>
         <AlertDialogContent dir={dashDir()}>
           <AlertDialogHeader>
             <AlertDialogTitle>{dtx("إرسال «{0}»؟", [campaign.name])}</AlertDialogTitle>
@@ -301,8 +308,8 @@ export function CampaignRowActions({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{dt("إلغاء")}</AlertDialogCancel>
-            <AlertDialogAction disabled={busy} onClick={send} className="bg-emerald-600 hover:bg-emerald-700">
+            <AlertDialogCancel disabled={busy}>{dt("إلغاء")}</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={event => { event.preventDefault(); void send(); }} className="bg-emerald-600 hover:bg-emerald-700">
               {dt("إرسال الآن")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -310,3 +317,4 @@ export function CampaignRowActions({
     </div>
   );
 }
+

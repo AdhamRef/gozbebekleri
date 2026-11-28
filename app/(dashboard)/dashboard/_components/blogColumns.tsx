@@ -9,9 +9,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { useLocale } from "next-intl";
+import { dt } from "@/lib/dashboard/i18n";
 
 export interface BlogRow {
   id: string;
@@ -34,6 +46,7 @@ function BlogRowActions({
   row: BlogRow;
   onDelete: (id: string) => void | Promise<void>;
 }) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const locale = useLocale()
   const { id } = row;
 
@@ -41,8 +54,8 @@ function BlogRowActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-11 w-11 p-0">
-            <span className="sr-only">فتح القائمة</span>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <span className="sr-only">{dt("فتح القائمة")}</span>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -52,8 +65,7 @@ function BlogRowActions({
               className="flex w-full justify-end items-center text-black"
               href={`/${locale}/blog/${row.slug || id}`}
             >
-              عرض
-              <Eye className="h-4 w-4 ml-2" />
+              {dt("عرض")}<Eye className="h-4 w-4 me-2" />
             </Link>
           </DropdownMenuItem>
           {row.category?.id && (
@@ -62,8 +74,7 @@ function BlogRowActions({
                 className="flex w-full justify-end items-center text-black"
                 href={`/${locale}/blog/category/${row.category.slug || row.category.id}`}
               >
-                عرض التصنيف
-                <Blocks className="h-4 w-4 ml-2" />
+                {dt("عرض التصنيف")}<Blocks className="h-4 w-4 me-2" />
               </Link>
             </DropdownMenuItem>
           )}
@@ -72,20 +83,40 @@ function BlogRowActions({
               className="flex w-full justify-end items-center text-black"
               href={`/dashboard/content/blog/${id}`}
             >
-              تعديل
-              <Pencil className="h-4 w-4 ml-2" />
+              {dt("تعديل")}<Pencil className="h-4 w-4 me-2" />
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
             className="flex w-full justify-end items-center text-red-600 focus:text-red-600"
-            onSelect={() => { void onDelete(id); }}
+            onSelect={(e) => {
+              e.preventDefault();
+              setShowDeleteDialog(true);
+            }}
           >
-            حذف
-            <Trash2 className="h-4 w-4 ml-2" />
+            {dt("حذف")}<Trash2 className="h-4 w-4 me-2" />
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{dt("حذف المقال")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {dt("هل أنت متأكد من حذف هذا المقال؟ لا يمكن التراجع عن هذا الإجراء.")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel>{dt("إلغاء")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-700 hover:bg-red-800"
+              onClick={async () => {
+                await onDelete(id);
+                setShowDeleteDialog(false);
+              }}
+            >
+              {dt("حذف")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
@@ -101,8 +132,7 @@ export function getBlogColumns(onDelete: (id: string) => void | Promise<void>): 
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          الصورة
-          <ArrowUpDown className="mx-2 h-[14px] w-[14px]" />
+          {dt("الصورة")}<ArrowUpDown className="mx-2 h-[14px] w-[14px]" />
         </Button>
       );
     },
@@ -113,7 +143,7 @@ export function getBlogColumns(onDelete: (id: string) => void | Promise<void>): 
             row.original.image ||
             "https://division.iium.edu.my/amad/wp-content/uploads/sites/2/2023/07/placeholder-282.png"
           }
-          alt={row.original.title || "صورة المقال"}
+          alt={row.original.title || dt("صورة المقال")}
           width={110}
           height={110}
           quality={95}
@@ -130,8 +160,7 @@ export function getBlogColumns(onDelete: (id: string) => void | Promise<void>): 
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          عنوان
-          <ArrowUpDown className="mr-2 h-[14px] w-[14px]" />
+          {dt("عنوان")}<ArrowUpDown className="ms-2 h-[14px] w-[14px]" />
         </Button>
       );
     },
@@ -146,8 +175,7 @@ export function getBlogColumns(onDelete: (id: string) => void | Promise<void>): 
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          التصنيف
-          <ArrowUpDown className="mr-2 h-[14px] w-[14px]" />
+          {dt("التصنيف")}<ArrowUpDown className="ms-2 h-[14px] w-[14px]" />
         </Button>
       );
     },

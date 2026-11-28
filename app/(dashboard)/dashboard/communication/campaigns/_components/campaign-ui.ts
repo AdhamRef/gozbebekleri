@@ -62,7 +62,7 @@ export const CHANNEL_META: Record<
   SMS: {
     get label() { return dt("الرسائل النصية"); },
     icon: MessageSquare,
-    href: "/dashboard/communication/campaigns",
+    href: "/dashboard/communication/sms",
     tile: "bg-brand-orange/10 text-brand-orange-700",
     dot: "bg-brand-orange",
   },
