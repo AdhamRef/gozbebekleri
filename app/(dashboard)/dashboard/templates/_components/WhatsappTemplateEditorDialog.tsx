@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { dt, dtx } from "@/lib/dashboard/i18n";
 import { isWhatsappUnsubscribeQuickReply, whatsappUnsubscribeCopy } from "@/lib/communication/whatsapp-template-unsubscribe";
 import type { TemplateKind } from "@/lib/communication/template-kind";
+import { SYSTEM_ORIGIN } from "@/lib/ported-systems/brand"; // Gozbebekleri: its own site address
 
 interface Props {
   initialKind: TemplateKind;
@@ -604,7 +605,7 @@ export function WhatsappTemplateEditorDialog({ initialKind, id, open, onOpenChan
       buttons: [
         ...current.buttons,
         type === "URL"
-          ? { type, text: dt("زيارة الموقع"), url: "https://minberiaksa.org" }
+          ? { type, text: dt("زيارة الموقع"), url: SYSTEM_ORIGIN }
           : type === "PHONE_NUMBER"
             ? { type, text: dt("اتصل بنا"), phoneNumber: "+90" }
             : { type, text: dt("رد سريع") },

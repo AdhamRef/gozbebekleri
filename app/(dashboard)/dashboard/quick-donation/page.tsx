@@ -249,7 +249,7 @@ export default function QuickDonationSettingsPage() {
           <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand">{dt("مؤسسة منبر الأقصى الدولية")}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand">{dt("جمعية قرة العيون للإغاثة والتكافل")}</p>
                 <h2 className="mt-1 text-lg font-bold text-slate-900">{titleAr.trim() || dt("التبرع السريع")}</h2>
               </div>
               <Badge variant={config.enabled ? "default" : "secondary"}>{config.enabled ? dt("مفعّلة") : dt("متوقفة")}</Badge>
