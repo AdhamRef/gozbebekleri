@@ -2627,3 +2627,27 @@ enum WaqfUnit {
   SHARE
   METER
 }
+
+/// Ported from Minber al-Aqsa (dashboard page port, additive).
+model GoogleSearchPlan {
+  workLeaseToken String?
+  workLeaseUntil DateTime?
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  connectionId String @db.ObjectId
+  title String
+  status String @default("DRAFT")
+  version Int @default(1)
+  request Json
+  proposal Json
+  evidence Json
+  resources Json?
+  lastError String?
+  automationEnabled Boolean @default(false)
+  automationPolicy Json?
+  lastReviewAt DateTime?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([connectionId, createdAt])
+  @@index([automationEnabled, lastReviewAt])
+}

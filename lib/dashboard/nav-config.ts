@@ -130,8 +130,6 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
     get group() { return dt("الإدارة"); },
     items: [
       { key: "platformConnections", get title() { return dt("بكسلات التتبع"); }, href: "/dashboard/platform-connections/tracking", icon: "radar", keywords: ["pixels", "meta", "tiktok", "snap"] },
-      // Gozbebekleri-only pages kept in the menu.
-      { key: "pixels", get title() { return dt("التتبع والتحويلات"); }, href: "/dashboard/marketing/tracking", icon: "target", keywords: ["tracking", "pixels", "conversions", "capi"] },
       { key: "platformConnections", get title() { return dt("مزودو التواصل والإرسال"); }, href: "/dashboard/platform-connections/communication", icon: "server", keywords: ["providers", "meta", "elastic email", "brevo", "netgsm", "whatsapp", "sms", "email"] },
       { key: "platformConnections", get title() { return dt("فحص الاتصال"); }, href: "/dashboard/platform-connections/health", icon: "heartPulse", keywords: ["health", "status", "diagnostics"] },
       { key: "platformConnectionsAdmin", get title() { return dt("تيليجرام"); }, href: "/dashboard/telegram", icon: "send", keywords: ["telegram", "bot", "notifications"], adminOnly: true },
